@@ -1,0 +1,45 @@
+In general, network programming is done using a client-server paradigm, where a server exists at a fixed address
+and serves information to client devices. A client requests to establish a connection, and then both client and
+server can freely send and receive data, until one side terminates the connection (manually or via timeout). 
+
+Traditionally, a client-server model implies specific behaviours for both parties--in web browsing for example, 
+a client (a web browser) establishes a connection to a server at a fixed address, and sends a request which 
+includes which web page/resource it wants to download. The server then checks that it knows what to do with the
+incoming request, and responds appropriately--in most cases, this simply involves sending the requested web page.
+
+Comparatively, the peer-to-peer paradigm features many hosts ("peers") all performing the same responsibilities,
+exchanging data in more or less even quantities between peers. However, even in the P2P model, the underlying 
+sockets using TCP and UDP are not created equal--in each connection, one peer is listening, and the other 
+connecting. In BitTorrent, a popular P2P protocol for file sharing, a central server known as a tracker stores a 
+list of IP addresses of peers who have agreed to behave like a server and listen for new connections. When a peer
+wants to join the swarm, it requests a list of peers from the central server, and attempts to establish a 
+connection to peers on that list while also listening for new connections from other peers. A P2P protocol does 
+not as much replace a client-server model as much as it makes all clients behave as if they were both a server
+and a client.
+
+The File Transfer Protocol (FTP) works similarly. Initially, the FTP server listens for connections until the FTP
+client connects. After the initial connection, the FTP client can request files from the server, which will 
+attempt to establish a new connection to the client for transfer. For this reason, the FTP client first 
+establishes a connection as a TCP client, but later accepts connections like a TCP server.
+
+Network programs can often be described as one of four types: TCP server, TCP client, UDP server, UDP client.
+
+TCP PROGRAM FLOW
+A TCP client program must first know the TCP server's address, which can be obtained from the user clicking a link
+or entering an address into the search bar (a URL). The TCP client uses the getaddrinfo() function to resolve it
+into a struct addrinfo structure. The client then creates a socket using a call to the socket() function, and then
+establishes a new TCP connection with a call to connect() (NOTE: Not applicable in time_server.c?) After that, the
+client can freely exchange data using send() and recv()
+
+A TCP server listens for connections at a particular port number on a particular interface. Like the client, the 
+server must first initialize a struct addrinfo structure with the proper listening IP address and port number. the
+getaddrinfo() function allows for this to be done in an IPv4/IPv6 independent way. The server then creates a 
+socket with a call to socket(), and then binds it to the listening IP address and port with bind().
+
+The server then calls listen(), which puts the socket in a state where it listens for new connections. The server
+then calls accept(), which will wait until a client establishes a connection to the server. When a new connection
+is established, accept() returns a new socket, which can be used to exchange data with the clint using send() and
+recv(). The first socket remains open to listen for new connections. Repeated calls to accept() allow the server
+to handle multiple clients.
+
+UDP PROGRAM FLOW
