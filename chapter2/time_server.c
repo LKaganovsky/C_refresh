@@ -281,7 +281,7 @@ int main() {
     socket remains open and listening for new connections. The new socket
     returned by accept() can only be used to send and receive data over the 
     newly established connection with a client. accept() also fills in address
-    info of the client that connected. When accept() returns, 
+    info of the client that connected. 
 
     When accept() returns, it will have stored the connected client's address
     in client_address, and filled in client_len with the length of that
@@ -303,11 +303,11 @@ int main() {
 
     /*
     At this point, a TCP connection has been established, and we print the 
-    client's address to the sonsole. This isn't necessary to the functionality
+    client's address to the console. This isn't necessary to the functionality
     of the program, but it is good practice to log connections somewhere.
 
     getnameinfo() takes the client's address and address length. The address
-    length is needed because getnameinfo() can work with both IPv6 and IPv6
+    length is needed because getnameinfo() can work with both IPv4 and IPv6
     addresses. We pass in an output buffer and buffer length. This is the 
     buffer than getnameinfo() writes its hostname output to. The next two
     arguments specify a second buffer and its length, which getnameinfo() 
