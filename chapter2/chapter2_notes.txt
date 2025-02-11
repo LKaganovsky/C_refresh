@@ -25,21 +25,101 @@ establishes a connection as a TCP client, but later accepts connections like a T
 Network programs can often be described as one of four types: TCP server, TCP client, UDP server, UDP client.
 
 TCP PROGRAM FLOW
-A TCP client program must first know the TCP server's address, which can be obtained from the user clicking a link
-or entering an address into the search bar (a URL). The TCP client uses the getaddrinfo() function to resolve it
-into a struct addrinfo structure. The client then creates a socket using a call to the socket() function, and then
-establishes a new TCP connection with a call to connect() (NOTE: Not applicable in time_server.c?) After that, the
-client can freely exchange data using send() and recv()
+TCP Client must know server's address--this is often obtained from the user via entering a URL into a browser or by 
+clicking a link. 
 
-A TCP server listens for connections at a particular port number on a particular interface. Like the client, the 
-server must first initialize a struct addrinfo structure with the proper listening IP address and port number. the
-getaddrinfo() function allows for this to be done in an IPv4/IPv6 independent way. The server then creates a 
-socket with a call to socket(), and then binds it to the listening IP address and port with bind().
+TCP Client uses getaddrinfo() to resolve the address of the server into a struct addrinfo structure.
 
-The server then calls listen(), which puts the socket in a state where it listens for new connections. The server
-then calls accept(), which will wait until a client establishes a connection to the server. When a new connection
-is established, accept() returns a new socket, which can be used to exchange data with the clint using send() and
-recv(). The first socket remains open to listen for new connections. Repeated calls to accept() allow the server
-to handle multiple clients.
+TCP Client creates a socket with socket().
+
+TCP Client establishes a new TCP connection by calling connect().
+
+TCP Client uses send() and recv() to exchange data with TCP Server.
+
+-----
+
+TCP Server calls getaddrinfo() to create an struct addrinfo structure with its own credentials. (?)
+
+TCP Server calls socket() to create a socket.
+
+TCP Server calls bind() to bind the socket to the listening IP address and port.
+
+TCP Server calls listen() and sets socket into a state where it listens for incoming connections.
+
+TCP Server calls accept() to preemptively accept incoming client connections to the server.
+
+TCP Server call to accept() returns a new socket when a new client connection has been established.
+
+TCP Server calls send() and recv() on new socket to exchange data with TCP Client.
+
+Note that there is significant variation in how this exchange can play out due to the asynchronous nature
+of networking. There is no rule as to which side calls send() or recv() first, or how many times. Both 
+sides should call send() as soon as the connection is established.
 
 UDP PROGRAM FLOW
+UDP Client must know the server's address.
+
+UDP Client uses getaddrinfo() to resolve the address of the server into a struct addrinfo structure.
+
+UDP Client creates a socket with socket().
+
+UDP Client uses sendto() to send the first packet.
+
+UDP Client uses sendto() and recvfrom() on its socket to send and receive additional packets.
+
+-----
+
+UDP Server calls getaddrinfo() to create a struct addrinfo structure with its own credentials. (?)
+
+UDP Server calls socket() to create a socket.
+
+UDP Server calls bind() to bind the socket to the listening IP address and port.
+
+UDP Server calls recvfrom(), blocks until it receives data from UDP Client.
+
+UDP Server unblocks after receiving data from a UDP Client, can freely sendto() and recvfrom().
+
+Note that the client must send the first packet in a UDP program.
+
+NEW FUNCTIONS
+getaddrinfo()   Allocates and initializes a linked list of addrinfo structures, based on the 
+                arguments passed in (host and service/port number). Protocol independent.
+
+socket()        Creates a socket and returns a file descriptor for that socket.
+
+bind()          A socket created by socket() exists in a name space (address family) but does
+                not have an address assigned to it. The bind() function assigns the sockaddr
+                structure argument to the socket file descriptor argument. Traditionally 
+                known as "assigning a name to a socket."
+
+listen()        Marks the socket referred to by the file descriptor argument as a passive 
+                socket, to listen for incoming connections it will respond to with accept().
+
+accept()        Used with connction-based socket types. Extracts the first connection request
+                on the queue of pending connections for the listening socket (specified by the
+                file descriptor), creates a new socket, and returns the new socket's file 
+                descriptor. New socket is not in listening state. The original socket is not
+                affected by this call.
+
+getnameinfo()   Inverse of getaddrinfo(). Converts a socket address to a corresponding host 
+                and service (port number). Protocol independent.
+
+send()          Sends data with a socket.
+
+recv()          Receives data with a socket.
+
+sendto()        Sends data from a socket without a bound remote address.
+
+recvfrom()      Receives data from a socket without a bound remote address.
+
+close()         Closes a socket. Winsock equivalent is closesocket().
+
+shutdown()      Closes the full-duplex connection on the specified socket gracefully.
+
+select()        Allows for a program to wait for one or more sockets to become "ready" for
+                some class of I/O operation.
+
+setsockopt()    Change options on the specified socket.
+
+fcntl()         Change additional options on the specified socket. Winsock equivalent is ioctlsocket().
+
