@@ -123,3 +123,62 @@ setsockopt()    Change options on the specified socket.
 
 fcntl()         Change additional options on the specified socket. Winsock equivalent is ioctlsocket().
 
+QUESTIONS
+1. What is a socket?
+    A socket is an endpoint of a communication link composed of an address and a port number, capable 
+    of sending and receiving data--historically, between processes (Inter-Process communication), currently, 
+    over TCP/UDP. Sockets generally come in two varities: Berkeley sockets (on macOS and Linux) and Winsock 
+    sockets (on Windows).
+
+2. What is a connectionless protocol? What is a connection-oriented protocol?
+    A connectionless protocol (like UDP) is one that only provides a best-effort service, making no guarantees
+    regarding data integrity, or even that the data will arrive. Comparatively, a connection-oriented protocol
+    (like TCP) provides connection setup, reliable, in-order delivery, as well as flow/congestion control.
+    Neither protocol provides guarantees regarding delay or bandwidth use.
+
+3. Is UDP a connectionless or connection-oriented protocol?
+    UDP is a connectionless protocol.
+
+4. Is TCP a connectionless or connection-oriented protocol?
+    TCP is a connection-oriented protocol.
+
+5. What types of applications generally benefit from using the UDP protocol?
+    Applications that do not have stringent data integrity requirements such as voIP or live video streaming
+    benefit from UDP due to their simultaneous need for fast data transfer and tolerance of data loss.
+
+6. What types of applications generally benefit from using the TCP protocol?
+    Applications that reqiure reliable data delivery and a maximal degree of data integrity such as HTTP or
+    SMTP benefit from TCP.
+
+7. Does TCP guarantee that data will be transmitted successfully?
+    TCP provides no guarantee that data will be transferred successfully. It makes attempts to maximize 
+    reliable transmission of data (packet numbering, checksums) but some situations cannot be overcome by
+    protocols (such as a server going down).
+
+8. What are some of the main differences between Berkeley sockets and Winsock sockets?
+    Differences between the two can be seen easily by looking at the heder files required.
+    -   Winsock sockets require initialization before use, and cleanup after finishing.
+    -   Return values of functions like socket() and accept() differ--in the time_server.c program, 
+        the ISVALIDSOCKET macro accounts for this.
+    -   Berkeley sockets use standard file descriptors, while Winsock sockets use any number for their
+        file descriptors.
+    -   Error retrieval is done differently, Berkeley sockets write error codes to the errno variable,
+        Winsock error codes must be retrieved with WSAGetLastError(socket).
+
+9. What does the bind() function do?
+    The bind() function takes 3 arguments--the socket file descriptor (int), an local nework address and port 
+    number (sockaddr structure), and address length (socklen_t/int). bind() assigns the address and port specified
+    in the sockaddr structure to the socket specified by the socket file descriptor. The bind() function is almost
+    always required for the server, and usually not required by the client.
+
+10. What does the accept() function do?
+    The accept() function takes 3 arguments--the socket file descriptor (int), a address (sockaddr structure),
+    and address length (socklen_t/int). accept() blocks until a TCP client connects to it. When a TCP client
+    connects, accept() extracts the first connection request on the queue of pending connections for the specified
+    socket, creates a new socket (NOT in the listening state) and returns a file descriptor for it. 
+
+11. In a TCP connection, does the client or the server send data first?
+    Either side can send data first in a TCP connection, since a connection is established prior to data exchange.
+
+
+
