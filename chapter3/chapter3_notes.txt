@@ -1,0 +1,160 @@
+MULTIPLEXING TCP CONNECTIONS
+By default, socket APIs are blocking. Blocking occurs when accept() waits for an incoming transmission, and when
+recv() is waiting for new data to read. Blocking was not an issue in the previous chapter where the demo program
+only accepted a single connection, but for all other uses, the issue of blocking must be considered when drafting
+a solution as real applications are generally expected to manage several connections simultaneously.
+
+Blocking is acceptable neither on the server side nor the client side--an application such as a browser for 
+example must be capable of downloading images, scripts, HTML, CSS, text content and more all in parallel in order
+to properly serve modern web pages.
+
+POLLING NON-BLOCKING SOCKETS
+One method to manage multiple sockets without the issue of blocking is to use polling. First, call fcntl() with
+the O_NONBLOCK flag (ioctlsocket() with the FIONBIO flag on Windows) to set a socket to non-blocking mode. Once 
+in non-blocking mode, a socket's call to recv() will return immediately if there is no data to be read. Therefore,
+a program could simply check each of its active sockets continuously, ignoring any socket that had no new data 
+and handle any socket that did. However, this is a massive waste of resources as sockets will be empty most of
+the time. This also complicates things, as the program must track which sockets are active and in which state they
+are in. Return values from recv() must also be handled differently than they would be with blocking sockets.
+
+FORKING AND MULTITHREADING
+A more feasible solution to multiplexing socket connections is to utilize multithreading. In a multithreaded 
+program, blocking sockets are no issue as they can only block their own servicing thread/process, allowing 
+requests to be served without interfering with the rest of the program. However, there are drawbacks to the
+use of multithreading for networked programs. Threading is difficult to get right, especially when it comes to
+applications that must share a state between one another (say for example, multiple clients attempting to access
+a database on a server. There must be a mechanism in place to prevent modifications of the same resource by 
+multiple users simultaneously). Additionally, multithreaded networked applications are less portable as each
+operating system provides its own API for these features.
+
+On Unix based systems (Linux, MacOS), multithreading is trivial. A call to fork() splits the executing program
+into two separate processes, both executing from the point of splitting. A program can fork() into a parent and
+child process, so the child can send() and recv() data while the parent remains available for accepting incoming
+connection requests. However, on Windows, multithreading is much more complicated. Windows provides 
+CreateProcess() and CreateThread(), as well as a menagerie of other functions. 
+
+THE SELECT() FUNCTION
+An OS neutral and effective method for multiplexing connections is to use the select() function. The select()
+function takes a set of sockets, and informs the program which are ready to be read. Additionally, select() can
+inform the program which sockets are ready to write to and which have exceptions (TODO: Method?). Both Berkeley
+sockets and Winsock sockets are supported by select()
+
+SYNCHRONOUS MULTIPLEXING WITH SELECT()
+Given a set of sockets, the select() function can be used to block until any of the sockets in that set is ready
+to be read from. Alternatively (TODO: additionally?), select() can be configured to return when a socket is ready
+to be written to, when a socket has an error, or after a predetermined amount of time with no activity.
+
+The C function prototype for select() is as follows:
+
+    int select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, struct timeval *timeout);
+
+The select() function takes sockets in the form of an fd_set, a structure that represents a set of file 
+descriptors. Four macros are used to manipulate a set of sockets:
+
+    FD_SET(int fd, fd_set *set)     Adds a socket to the fd_set.
+    FD_CLR(int fd, fd_set *set)     Removes a socket from the fd_set.
+    FD_ISSET(int fd, fd_set *set)   Checks if a certain socket file descriptor is in the fd_set.
+    FD_ZERO(fd_set *set)            Removes all file descriptors from a set (initialization).
+
+Which can be used like so:
+
+    fd_set our_sockets;
+    FD_ZERO(&our_sockets);
+    FD_SET(socket_listener, &our_sockets);
+    FD_SET(socket_a, &our_sockets);
+    FD_SET(socket_b, &our_sockets);
+
+Additionally, select() requires a value for nfds that is larger than the largest socket descriptor which it will
+monitor. While this value is ignored on Windows systems, it should still be done for the purpose of portability.
+
+    SOCKET max_socket;
+    max_socket = socket_listener;
+    if (socket_a > socket_b) max_socket = socket_a;
+    if (socket_b > socket_a) max_socket = socket_b;
+
+Note that select() modifies the fd_set it is operating on to indicate which sockets are ready--as such, it is
+wise to copy the socket set before calling it. An fd_set can be copied with a simple assignment, like so:
+
+    fd_set copy;
+    copy = our_sockets;
+
+And have select() called on it like this:
+
+    select(max_socket+1, &copy, 0, 0, 0);
+
+Take notice of the 0 values as select()'s third and fourth arguments. This is to indicate that select() should
+not be monitoring any fd_sets for sockets opening for writing or sockets returning errors. The fifth argument is
+for time outs (covered below).
+
+This call blocks until at least one socket has something to read. When select() returns, copy is modified such 
+that it only contains the sockets that are ready to be read from, what sockets these are can be checked with
+FD_ISSET() like so (TODO: What the hell is this really how its done?):
+
+    if (FD_ISSET(socket_listener &copy)) {
+        // socket_listener has a new connection
+        accept(socket_listener...)
+    }
+
+    if (FD_ISSET(socket_a, &copy)) {
+        // socket_a is ready to be read from
+        recv(socket_a...)
+    }
+
+    if (FD_ISSET(socket_b, &copy)) {
+        // socket_b is ready to be read from
+        recv(socket_b...)
+    }
+
+SELECT() TIMEOUT
+Recall the syntax of select function is as follows:
+
+    int select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, struct timeval *timeout);
+
+The last parameter, timeout, is a pointer to a timeval struct which indicates after when a function should return.
+timeval is defined as follows:
+
+    struct timeval {
+        long tv_sec;
+        long tv_usec;
+    }
+
+Where tv_sec holds the number of seconds, and tv_usec holds the number of microseconds (1/1,000,000th of a 
+second). To set select()'s timeout value to 1.5 seconds, the following can be done:
+
+    struct timeval timeout;
+    timeout.tv_sec = 1;
+    timeout.tv_usec = 500000;
+    select(max_socket+1, &copy, 0, 0, &timeout);
+
+In this case, select() returns after a socket in the fd_set copy is ready to read, or after 1.5 seconds has 
+elapsed, whichever is sooner. If the timeout value is a total of 0.0 seconds, then select() will return 
+immediately (after changing the fd_set as appropriate). Passing a null pointer as the timeout value to select()
+will make it so select() does not time out until at least one socket is ready to be read.
+
+The select() function can also be used to monitor for writeable sockets (sockets where send() can be called 
+without blocking), and sockets with exceptions. All three can be checked in one call:
+
+    select(max_sockets+1, &ready_to_read, &ready_to_write, &excepted, &timeout);
+
+On success, select() returns the number of socket descriptors contained in the (up to) three descriptor fd_sets
+it monitored. The return value is 0 if it timed out before any sockets were readable/writeable/excepted. On 
+error, select() will return a -1.
+
+ITERATING THROUGH AN FD_SET
+We can iterate through an fd_set using a simple for loop. Since all socket descriptors are positive numbers,
+and are generally allocated sequentially (at least in Linux and macOS). As an example, here is how every socket
+in the fd_set master could be closed:
+
+SOCKET i;
+fo(i = 1; i <= max_socket; ++i) {
+    if(FD_ISSET(i, &master)) {
+        CLOSESOCKET(i);
+    }
+}
+
+As stupid of a brute force of a method as this is it's kind of all that there is to work with. FD_ISSET() runs 
+very fast, and the meagre amount of time spent iterating will be dwarfed by the processor time spent on other
+socket operations. However, this operation can be optimized by storing sockets in an array or linked list. It is
+not recommended to make that oprtimization though, unless the for loop is a significant bottleneck.
+
+SELECT() ON NON-SOCKETS
