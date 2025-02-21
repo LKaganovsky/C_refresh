@@ -158,3 +158,6 @@ socket operations. However, this operation can be optimized by storing sockets i
 not recommended to make that oprtimization though, unless the for loop is a significant bottleneck.
 
 SELECT() ON NON-SOCKETS
+On Linux/MacOS, select() can also be used on file and terminal I/O. However, on Windows, select() is only 
+supported for sockets.
+
