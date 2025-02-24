@@ -17,6 +17,11 @@
 
 #endif
 
+#if !defined(IPV6_V6ONLY)
+   #define IPV6_V6ONLY 27
+   #endif
+
+
 #if defined (_WIN32)
 #define ISVALIDSOCKET(s) ((s) != INVALID_SOCKET)    // Why is s in an extra set of brackets?
 #define CLOSESOCKET(s) closesocket(s)
@@ -46,7 +51,7 @@ int main(){
 
     struct addrinfo hints;
     memset(&hints, 0, sizeof(hints));
-    hints.ai_family = AF_INET;
+    hints.ai_family = AF_INET6;
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_flags = AI_PASSIVE;
 
@@ -57,6 +62,12 @@ int main(){
     socket_listen = socket(binding_address->ai_family, binding_address->ai_socktype, binding_address->ai_flags);
     if (!ISVALIDSOCKET(socket_listen)) {
         fprintf(stderr, "ERROR: Issue with creating listening socket. (%d)\n", GETSOCKETERRNO());
+        return 1;
+    }
+
+    int option = 0;
+    if(setsockopt(socket_listen, IPPROTO_IPV6, IPV6_V6ONLY, (void*) &option, sizeof(option))) {
+        fprintf(stderr, "ERROR: Issue with setting socket options for IPv4/IPv6 capabilities. (%d)\n", GETSOCKETERRNO());
         return 1;
     }
 
