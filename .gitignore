@@ -2,3 +2,6 @@ chapter1/unix_list
 chapter2/time_server
 .vscode/settings.json
 chapter2/time_server_mine
+.vscode/tasks.json
+chapter2/time_server_mine.dSYM/Contents/Info.plist
+chapter2/time_server_mine.dSYM/Contents/Resources/DWARF/time_server_mine

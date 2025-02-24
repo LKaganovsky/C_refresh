@@ -44,99 +44,74 @@ int main(){
         }
     #endif
 
-    printf("Configuring local address...\n");
     struct addrinfo hints;
     memset(&hints, 0, sizeof(hints));
     hints.ai_family = AF_INET;
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_flags = AI_PASSIVE;
 
-    struct addrinfo *bindings;
-    if (getaddrinfo(0, LISTENING_PORT, &hints, &bindings)) {
-        fprintf(stderr, "ERROR: getaddrinfo failure. (%d)\n", GETSOCKETERRNO());    // Does this work?
-    }
+    struct addrinfo *binding_address;
+    getaddrinfo(0, "9999", &hints, &binding_address);
 
-    printf("Creating socket...\n");
-    SOCKET socket_listener;
-    socket_listener = socket(bindings->ai_family, bindings->ai_socktype, bindings->ai_protocol);
-
-    if(!ISVALIDSOCKET(socket_listener)) {
-        fprintf(stderr, "ERROR: issue with socket creation. (%d)\n", GETSOCKETERRNO());
+    SOCKET socket_listen;
+    socket_listen = socket(binding_address->ai_family, binding_address->ai_socktype, binding_address->ai_flags);
+    if (!ISVALIDSOCKET(socket_listen)) {
+        fprintf(stderr, "ERROR: Issue with creating listening socket. (%d)\n", GETSOCKETERRNO());
         return 1;
     }
 
-    printf("Binding socket to local address...\n");
-    if(bind(socket_listener, bindings->ai_addr, bindings->ai_addrlen)) {
-        fprintf(stderr, "ERROR: issue with binding socket to local address. (%d)\n", GETSOCKETERRNO());
+    if(bind(socket_listen, binding_address->ai_addr, binding_address->ai_addrlen)) {
+        fprintf(stderr, "ERROR: Issue with binding address to listening socket. (%d)\n", GETSOCKETERRNO());
+        return 1;
+    }
+    freeaddrinfo(binding_address);
+
+    printf("Listening...\n");
+    if(listen(socket_listen, 10) < 0) {
+        fprintf(stderr, "ERROR: Issue with setting up listening socket. (%d)\n", GETSOCKETERRNO());
         return 1;
     }
 
-    printf("Listening for incoming connections...\n");
-    if(listen(socket_listener, 10)){
-        fprintf(stderr, "ERROR: issue with listening for new connections. (%d)\n", GETSOCKETERRNO());
-        return 1;
-    }
-    
-    printf("Waiting for an incoming connection...\n");
-    struct sockaddr_storage client_address_storage;
-    socklen_t socket_length = sizeof(client_address_storage);
-
-    // Define variable for socket length, cast client address storage as (struct sockaddr*)?
-    SOCKET connected_client = accept(socket_listener, (struct sockaddr *) &client_address_storage, &socket_length);
-
-    if(!ISVALIDSOCKET(connected_client)) {
-        fprintf(stderr, "ERROR: Issue with accepting connection.(%d)\n", GETSOCKETERRNO());
+    struct sockaddr_storage client_address;
+    socklen_t client_address_length;
+    SOCKET socket_client = accept(socket_listen, (struct sockaddr*) &client_address, &client_address_length);
+    if(!ISVALIDSOCKET(socket_client)) {
+        fprintf(stderr, "ERROR: Issue with creating client socket. (%d)\n", GETSOCKETERRNO());
         return 1;
     }
 
-    printf("A client has connected!\n");
-    char client_address_buffer[100];
-    getnameinfo((struct sockaddr *) &client_address_storage, socket_length, client_address_buffer, 
-    sizeof(client_address_buffer), 0, 0, NI_NUMERICHOST);
-    printf("%s\n", client_address_buffer);
+    char address_buffer[100];
+    getnameinfo((struct sockaddr*) &client_address, client_address_length, 
+    address_buffer, sizeof(address_buffer), 0, 0, NI_NUMERICHOST);
+    printf("%s\n", address_buffer);
 
-    printf("Receiving a message...\n");
-    char request_buffer[1000];
-    int request_length = recv(connected_client, request_buffer, sizeof(request_buffer), 0);
-    if (request_length == -1){
-        printf("ERROR: Issue with receiving message from client.\n");
-        return 1;
-    }
+    char request[1024];
+    int bytes_received = recv(socket_client, request, 1024, 0);
+    printf("Received %d bytes.\n", bytes_received);
 
-    // Recall that there is no guarantee that the data received from recv() is null terminated.
-    // request_length added so this can actually be printed (previously the return value from)
-    // recv() was used just
-    printf("%.*s", request_length, request_buffer);
+    printf("%.*s", bytes_received, request);
 
-    printf("Sending response...\n");
-    const char* response = 
-        "HTTP/1.1 200 OK\r\n"
-        "Connection: close\r\n"
+
+    char* response = 
+        "HTTP/1.1 200 OK\r\n" 
+        "Connection: close\r\rn"
         "Content-Type: text/plain\r\n\r\n"
-        "Current time is: ";
+        "Local time is: ";
 
-    if(send(connected_client, response, strlen(response), 0) == -1){
-        printf("ERROR: Issue with sending response to client.\n");
-        return 1;
-    }
+    
+    int bytes_sent = send(socket_client, response, strlen(response), 0);
+    printf("Sent %d bytes out of %d\n", bytes_sent, (int) strlen(response));
 
-    printf("Getting time...\n");
-    time_t current_time;
-    time(&current_time);
-    char* current_time_message = ctime(&current_time);
-    int bytes_sent = send(connected_client, current_time_message, strlen(current_time_message), 0);
-    if (bytes_sent != (int) strlen(current_time_message)) {
-        printf("ERROR: Did not send entire time message.\n");
-        return 1;
-    }
+    time_t timer;
+    time(&timer);
+    char* time_text = ctime(&timer);
 
-    printf("Closing connection to client.\n");
-    CLOSESOCKET(connected_client);
+    bytes_sent = send(socket_client, time_text, strlen(time_text), 0);
+    printf("Sent %d bytes out of %d\n", bytes_sent, (int) strlen(time_text));
 
-    #if defined(_WIN32)
-        WSACleanup();
-    #endif
+    
 
-    printf("Program finished.\n");
+    CLOSESOCKET(socket_client);
     return 0;
+
 }

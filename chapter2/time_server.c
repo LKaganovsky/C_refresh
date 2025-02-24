@@ -128,15 +128,20 @@ int main() {
         int socktype    (Preferred socket type, SOCK_DGRAM for UDP or 
                         SOCK_STREAM for TCP. 0 In this field signifies socket
                         addresses of any type can be returned by getaddrinfo())
-        int ai flags    (Ought to read more about this. It appears that the
+        int ai_flags    (Ought to read more about this. It appears that the
                         AI_PASSIVE flag signifies that the caller intends to 
                         use the returned socket address to bind() a socket that
                         will accept() connectons. The summary in the textbook
                         says that this line actually informs getaddrinfo() that
                         we want it to bind to the wildcard address, that is,
-                        asking getaddrinfo() to set up the address, so we listen
-                        on any available network interface. 
+                        asking getaddrinfo() to set up the address, so we 
+                        listen on any available network interface. 
                         TODO: Read more on this)
+
+    Additional things to note is that hints is only used for a short duration
+    of time, and the manual page for it states that all fields outside of 
+    ai_family, ai_socktype, ai_protocol and ai_flags should be null (hence the
+    use of memset).
     */
     printf("Configuring local address...\n");
     struct addrinfo hints;
@@ -151,8 +156,25 @@ int main() {
     from getaddrinfo(). getaddrinfo() has many uses, and in this case we are 
     using it to generate an address that is suitable for bind(). 
     
-    To make sure  it generates this, we pass in the first parameter as NULL 
-    and have the AI_PASSIVE flag set in hints.ai_flags.
+    To make sure it generates this, we pass in the first parameter as NULL 
+    and have the AI_PASSIVE flag set in hints.ai_flags. This informs the 
+    function that we are intending to use this address to create a listening
+    socket (As the man page phrases it: the returned socket will be suitable
+    for bind()ing a socket that will accept() connections). The returned 
+    address here will be a "wildcard address," an address that is used by 
+    applications (typically servers) that intend to accept connections on
+    *any* of the host's network addresses. This is a little difficult to 
+    showcase on a mac, but using the bash command "scutil --nwi" will display
+    all available network interfaces--when running this program, try using
+    one of them in place of 127.0.0.1:8080 in the browser. I only get back
+    10.0.0.216, so I could see this application from my browser by going to
+    10.0.0.216:8080. But if this computer supported more addresses, perhaps if
+    it had two more interfaces with the addresses 10.0.0.217 and 10.0.0.218, 
+    then visiting 10.0.0.217:8080 or 10.0.0.218:8080 would yield the same
+    page as the loopback. 
+    
+    Double checking on Wikipedia, if the node address is NULL, the addresses 
+    0.0.0.0 or 127.0.0.1 are assigned based on the hints flags.
 
     The second parameter is the port we listen for connections on, chosen
     arbitrarily. However, since only one program can bind to a particular
@@ -160,7 +182,7 @@ int main() {
     should be manually changed (Or, a smarter strategy should be used to pick
     a port, that isn't hardcoding.)
 
-    There are cases wher a call to getaddrinfo() is unnecessary, and an
+    There are cases where a call to getaddrinfo() is unnecessary, and an
     addrinfo struct can instead just be filled directly. The advantage of using
     getaddrinfo() is that it is protocol-independent, and as a result can 
     easily be converted between IPv4 and IPv6, just by changing AF_INET to
@@ -182,7 +204,13 @@ int main() {
     reason that getaddrinfo() was called before socket() was to allow for the 
     passing in of fields from bind_address as arguments to socket(), making
     it easier to change our programs protocol between UDP/TCP without needing 
-    significant reworking.
+    significant reworking. It'd be possible to do this without calling the
+    getaddrinfo() function but it would look like this:
+
+        socket_listen = socket(AF_INET6, SOCK_STREAM, AI_PASSIVE);
+
+    Which isn't long, but if we choose to change anything in bind_address it
+    will require this to be changed too.
 
     In most programs, socket() is called before getaddrinfo(), which is fine
     but complicates the program as information must be entered multiple times.
@@ -280,8 +308,8 @@ int main() {
     connection is made, accept() will create a new socket, while the original
     socket remains open and listening for new connections. The new socket
     returned by accept() can only be used to send and receive data over the 
-    newly established connection with a client. accept() also fills in address
-    info of the client that connected. 
+    newly established connection with a client. accept() also fills in the
+    client_address variable with address information of the connected client.
 
     When accept() returns, it will have stored the connected client's address
     in client_address, and filled in client_len with the length of that
