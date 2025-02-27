@@ -5,3 +5,5 @@ chapter2/time_server_mine
 .vscode/tasks.json
 chapter2/time_server_mine.dSYM/Contents/Info.plist
 chapter2/time_server_mine.dSYM/Contents/Resources/DWARF/time_server_mine
+chapter3/tcp_client
+chapter3/tcp_serve_toupper
