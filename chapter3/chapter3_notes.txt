@@ -1,47 +1,47 @@
 MULTIPLEXING TCP CONNECTIONS
-By default, socket APIs are blocking. Blocking occurs when accept() waits for an incoming transmission, and when
-recv() is waiting for new data to read. Blocking was not an issue in the previous chapter where the demo program
-only accepted a single connection, but for all other uses, the issue of blocking must be considered when drafting
+By default, socket APIs are blocking. Blocking occurs when accept() waits for an incoming transmission, and when 
+recv() is waiting for new data to read. Blocking was not an issue in the previous chapter where the demo program 
+only accepted a single connection, but for all other uses, the issue of blocking must be considered when drafting 
 a solution as real applications are generally expected to manage several connections simultaneously.
 
 Blocking is acceptable neither on the server side nor the client side--an application such as a browser for 
-example must be capable of downloading images, scripts, HTML, CSS, text content and more all in parallel in order
+example must be capable of downloading images, scripts, HTML, CSS, text content and more all in parallel in order 
 to properly serve modern web pages.
 
 POLLING NON-BLOCKING SOCKETS
-One method to manage multiple sockets without the issue of blocking is to use polling. First, call fcntl() with
+One method to manage multiple sockets without the issue of blocking is to use polling. First, call fcntl() with 
 the O_NONBLOCK flag (ioctlsocket() with the FIONBIO flag on Windows) to set a socket to non-blocking mode. Once 
 in non-blocking mode, a socket's call to recv() will return immediately if there is no data to be read. Therefore,
 a program could simply check each of its active sockets continuously, ignoring any socket that had no new data 
-and handle any socket that did. However, this is a massive waste of resources as sockets will be empty most of
-the time. This also complicates things, as the program must track which sockets are active and in which state they
+and handle any socket that did. However, this is a massive waste of resources as sockets will be empty most of 
+the time. This also complicates things, as the program must track which sockets are active and in which state they 
 are in. Return values from recv() must also be handled differently than they would be with blocking sockets.
 
 FORKING AND MULTITHREADING
 A more feasible solution to multiplexing socket connections is to utilize multithreading. In a multithreaded 
 program, blocking sockets are no issue as they can only block their own servicing thread/process, allowing 
-requests to be served without interfering with the rest of the program. However, there are drawbacks to the
-use of multithreading for networked programs. Threading is difficult to get right, especially when it comes to
-applications that must share a state between one another (say for example, multiple clients attempting to access
+requests to be served without interfering with the rest of the program. However, there are drawbacks to the 
+use of multithreading for networked programs. Threading is difficult to get right, especially when it comes to 
+applications that must share a state between one another (say for example, multiple clients attempting to access 
 a database on a server. There must be a mechanism in place to prevent modifications of the same resource by 
-multiple users simultaneously). Additionally, multithreaded networked applications are less portable as each
+multiple users simultaneously). Additionally, multithreaded networked applications are less portable as each 
 operating system provides its own API for these features.
 
-On Unix based systems (Linux, MacOS), multithreading is trivial. A call to fork() splits the executing program
-into two separate processes, both executing from the point of splitting. A program can fork() into a parent and
-child process, so the child can send() and recv() data while the parent remains available for accepting incoming
+On Unix based systems (Linux, MacOS), multithreading is trivial. A call to fork() splits the executing program 
+into two separate processes, both executing from the point of splitting. A program can fork() into a parent and 
+child process, so the child can send() and recv() data while the parent remains available for accepting incoming 
 connection requests. However, on Windows, multithreading is much more complicated. Windows provides 
 CreateProcess() and CreateThread(), as well as a menagerie of other functions. 
 
 THE SELECT() FUNCTION
-An OS neutral and effective method for multiplexing connections is to use the select() function. The select()
-function takes a set of sockets, and informs the program which are ready to be read. Additionally, select() can
-inform the program which sockets are ready to write to and which have exceptions (TODO: Method?). Both Berkeley
+An OS neutral and effective method for multiplexing connections is to use the select() function. The select() 
+function takes a set of sockets, and informs the program which are ready to be read. Additionally, select() can 
+inform the program which sockets are ready to write to and which have exceptions (TODO: Method?). Both Berkeley 
 sockets and Winsock sockets are supported by select()
 
 SYNCHRONOUS MULTIPLEXING WITH SELECT()
-Given a set of sockets, the select() function can be used to block until any of the sockets in that set is ready
-to be read from. Alternatively (TODO: additionally?), select() can be configured to return when a socket is ready
+Given a set of sockets, the select() function can be used to block until any of the sockets in that set is ready 
+to be read from. Alternatively (TODO: additionally?), select() can be configured to return when a socket is ready 
 to be written to, when a socket has an error, or after a predetermined amount of time with no activity.
 
 The C function prototype for select() is as follows:
@@ -53,7 +53,7 @@ descriptors. Four macros are used to manipulate a set of sockets:
 
     FD_SET(int fd, fd_set *set)     Adds a socket to the fd_set.
     FD_CLR(int fd, fd_set *set)     Removes a socket from the fd_set.
-    FD_ISSET(int fd, fd_set *set)   Checks if a certain socket file descriptor is in the fd_set.
+    FD_ISSET(int fd, fd_set *set)   Checks if a certain socket file descriptor is in the fd_set. 
     FD_ZERO(fd_set *set)            Removes all file descriptors from a set (initialization).
 
 Which can be used like so:
@@ -64,8 +64,8 @@ Which can be used like so:
     FD_SET(socket_a, &our_sockets);
     FD_SET(socket_b, &our_sockets);
 
-Additionally, select() requires a value for nfds that is larger than the largest socket descriptor which it will
-monitor. While this value is ignored on Windows systems, it should still be done for the purpose of portability.
+Additionally, select() requires a value for nfds that is larger than the largest socket descriptor which it will 
+monitor. While this value is ignored on Windows systems, it should still be done for the purpose of portability. 
 
     SOCKET max_socket;
     max_socket = socket_listener;
@@ -82,12 +82,12 @@ And have select() called on it like this:
 
     select(max_socket+1, &copy, 0, 0, 0);
 
-Take notice of the 0 values as select()'s third and fourth arguments. This is to indicate that select() should
+Take notice of the 0 values as select()'s third and fourth arguments. This is to indicate that select() should 
 not be monitoring any fd_sets for sockets opening for writing or sockets returning errors. The fifth argument is
 for time outs (covered below).
 
 This call blocks until at least one socket has something to read. When select() returns, copy is modified such 
-that it only contains the sockets that are ready to be read from, what sockets these are can be checked with
+that it only contains the sockets that are ready to be read from, what sockets these are can be checked with 
 FD_ISSET() like so (TODO: What the hell is this really how its done?):
 
     if (FD_ISSET(socket_listener &copy)) {
@@ -110,7 +110,7 @@ Recall the syntax of select function is as follows:
 
     int select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, struct timeval *timeout);
 
-The last parameter, timeout, is a pointer to a timeval struct which indicates after when a function should return.
+The last parameter, timeout, is a pointer to a timeval struct which indicates after when a function should return. 
 timeval is defined as follows:
 
     struct timeval {
@@ -128,21 +128,21 @@ second). To set select()'s timeout value to 1.5 seconds, the following can be do
 
 In this case, select() returns after a socket in the fd_set copy is ready to read, or after 1.5 seconds has 
 elapsed, whichever is sooner. If the timeout value is a total of 0.0 seconds, then select() will return 
-immediately (after changing the fd_set as appropriate). Passing a null pointer as the timeout value to select()
-will make it so select() does not time out until at least one socket is ready to be read.
+immediately (after changing the fd_set as appropriate). Passing a null pointer as the timeout value to select() 
+will make it so select() does not time out until at least one socket is ready to be read. 
 
 The select() function can also be used to monitor for writeable sockets (sockets where send() can be called 
-without blocking), and sockets with exceptions. All three can be checked in one call:
+without blocking), and sockets with exceptions. All three can be checked in one call: 
 
     select(max_sockets+1, &ready_to_read, &ready_to_write, &excepted, &timeout);
 
-On success, select() returns the number of socket descriptors contained in the (up to) three descriptor fd_sets
+On success, select() returns the number of socket descriptors contained in the (up to) three descriptor fd_sets 
 it monitored. The return value is 0 if it timed out before any sockets were readable/writeable/excepted. On 
 error, select() will return a -1.
 
 ITERATING THROUGH AN FD_SET
-We can iterate through an fd_set using a simple for loop. Since all socket descriptors are positive numbers,
-and are generally allocated sequentially (at least in Linux and macOS). As an example, here is how every socket
+We can iterate through an fd_set using a simple for loop. Since all socket descriptors are positive numbers, 
+and are generally allocated sequentially (at least in Linux and macOS). As an example, here is how every socket 
 in the fd_set master could be closed:
 
 SOCKET i;
@@ -153,11 +153,108 @@ fo(i = 1; i <= max_socket; ++i) {
 }
 
 As stupid of a brute force of a method as this is it's kind of all that there is to work with. FD_ISSET() runs 
-very fast, and the meagre amount of time spent iterating will be dwarfed by the processor time spent on other
-socket operations. However, this operation can be optimized by storing sockets in an array or linked list. It is
+very fast, and the meagre amount of time spent iterating will be dwarfed by the processor time spent on other 
+socket operations. However, this operation can be optimized by storing sockets in an array or linked list. It is 
 not recommended to make that oprtimization though, unless the for loop is a significant bottleneck.
 
 SELECT() ON NON-SOCKETS
 On Linux/MacOS, select() can also be used on file and terminal I/O. However, on Windows, select() is only 
 supported for sockets.
+
+A TCP SERVER
+The internet today offers many microservices, provided by small subsystems that communicate over a network. As a 
+simple example, consider a service which formats a string. Instead of writing your own code, you could simply 
+enter your string into a website which provides this service, and a server will do it for you. 
+
+BLOCKING ON SEND
+When calling send() on some data, the data is initially copied into an outgoing buffer provided by the operating 
+system. If send() is called when this buffer is already full, that call to send() will block until the buffer has 
+emptied enough to accept more data. (TODO: Does the buffer need to empty enough to send all of the data, or a 
+chunk of a certain size? When multiple send() calls are blocked and trying to send data into the buffer, what 
+determines the order of which call the buffer will take data from first?)
+
+The send() function may also return without copying all data as requested, with a return value of how many 
+bytes were actually copied. This situation may occur when the program is blocked on the send(), but receives a 
+signal from the operating system. In situations like this, it is upon the caller to try again with any remaining 
+data.
+
+The possibility of send() blocking or be interrupted is ignored in the tcp_serve_toupper.c program from this 
+chapter. A robust method of noticing this issue is calculating the size of the data before attempting to send 
+it, and after sending it, compare the return value from send() with this precalculated size. If the number of 
+bytes sent is less than requested, then select() can be used to determine the next time the appropriate socket 
+is available for accepting new data, and that data can be sent with send(). This may become complicated with 
+multiple sockets.
+
+The code snipped below assumes that buffer contains buffer_len bytes of data to send over a socket named 
+peer_socket, and blocks until all of buffer is sent or an error occurs.
+
+int begin = 0
+while (begin < buffer_len) {
+    int sent = send(peer_socket, buffer + begin, buffer_len - begin, 0);
+    if (sent == -1) {
+        // Handle this error
+    }
+    begin += sent;
+}
+
+When managing multiple sockets and attempting to avoid blocking, all sockets with pending send() calls should be 
+put into an fd_set and be passed as the third parameter to select(). When select() signals on these sockets, it 
+indicates that they are ready to send data.
+
+TCP IS A STREAM PROTOCOL
+The send() and recv() functions work somewhat like writing and reading from a file, where reads and writes are 
+cumulative. For example, if a program writes 10 bytes to a file, then another 10 bytes, then another 10 bytes, 
+the file would have 30 bytes total. Later on, these bites can be read by a program, which reads 5 bytes and then 
+25 bytes, or perhaps 5 then 10 then 15 bytes, or all 30 at once. Regardless, there is no way of knowing how that 
+file was written to, in what chunks of data. The send() and recv() functions work similarly--If a certain number 
+of bytes are sent with send(), it's not possible to predict how many recv() calls those bytes will be partitioned 
+into.
+
+In many protocols, it is important that received data is buffered until it is big enough to warrant reading and 
+processing. In the tcp_serve_toupper.c program in this chapter, this issue was avoided by defining a rudimentary 
+protocol that worked just as well on 1 byte as it did on 100--though this is not true for all protocols.
+
+For example, consider the possibility of adding a built-in exit function to tcp_serve_toupper.c where the program 
+will terminate when "quit" is received through a TCP socket. A client could call send(socket, "quit", 4, 0) to 
+send a quit command. However, there is no guarantee as to how the server will recv() that. It may receive the 
+"qui" in one read and "t" in another, or "qu" and "it" or the like. Consider how you would interpret if a quit 
+command has been received--a rather straightforward way of doing this would be with a buffer filled with data 
+from multiple calls to recv().
+
+QUESTIONS
+1. How can you tell whether the next call to recv() will block?
+    A call to recv() will block if there is no data to read--this can be indicated by using the select() function 
+    to iterate over an fd_set of sockets, and seeing if the socket fd in question is in it.
+
+2. How can you ensure that select() does not block for longer than a specified time?
+    To ensure select() does not remain blocked for too long, a timeval struct should be passed into the last 
+    parameter to represent (in seconds and microseconds) how long select() should wait until returning when 
+    there are no sockets to be read from/written to/excepted.
+
+3. When we used our tcp_client.c program to connect to a web server, why did a blank line need to be sent before 
+   the server responded? 
+   HTTP expects a blank line to be sent to indicate the end of a request. Without this blank line, we wouldn't 
+   know if the client was going to keep sending additional request headers.
+    
+4. Does send() ever block?
+    The send() function blocks if the sending buffer is full, in which case it will unblock once the buffer has 
+    cleared enough to allow send() to input data properly. Again, select() can be used to determine if a socket 
+    will block.
+
+5. How can we tell whether the socket has been disconnected by our peer?
+    The recv() function will return -1 when attempting to read data sent by the client.
+
+6. Is the data received by recv() always the same size as the data sent with send()?
+    No, it is not. There is no way to guarantee how many send()/recv() calls are required to transmit data.
+
+7. Consider the following code: What is wrong with it?
+        recv(socket_peer, buffer, 4096, 0);
+        printf(buffer);
+    In this code, buffer is unsafe to print. The buffer is not guaranteed to be null terminated.
+
+    This code as well:
+        recv(socket_peer, buffer, 4096, 0);
+        printf("%s", buffer);
+    The buffer is again not guaranteed to be null terminated.
+
 
