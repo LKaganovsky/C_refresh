@@ -8,3 +8,6 @@ chapter2/time_server_mine.dSYM/Contents/Resources/DWARF/time_server_mine
 chapter3/tcp_client
 chapter3/tcp_serve_toupper
 chapter3/tcp_serve_chat
+chapter4/udp_recvfrom
+chapter4/udp_client
+chapter4/udp_sendto

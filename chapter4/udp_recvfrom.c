@@ -2,7 +2,7 @@
 
 /*
 CHAPTER 4:  Establishing UDP Connections
-            A UDP Server
+            A UDP Server (pg. 108 - 112)
 
 To execute: gcc udp_recvfrom.c -o udp_recvfrom
             ./udp_recvfrom
@@ -24,12 +24,13 @@ int main(){
 
     printf("Getting local address...\n");
     struct addrinfo hints;
-    hints.ai_flags = AF_INET;
+    memset(&hints, 0, sizeof(hints));
+    hints.ai_family = AF_INET;
     hints.ai_socktype = SOCK_DGRAM;
     hints.ai_flags = AI_PASSIVE;
 
     struct addrinfo *bind_address;
-    bind_address = getaddrinfo(0, "8080", &hints, &bind_address);
+    getaddrinfo(0, "8080", &hints, &bind_address);
 
     printf("Creating socket...\n");
     SOCKET socket_listen;
@@ -39,9 +40,9 @@ int main(){
         return 1;
     }
 
-    printf("Binding socket to local address...");
+    printf("Binding socket to local address...\n");
     if (bind(socket_listen, bind_address->ai_addr, bind_address->ai_addrlen)) {
-        fprintf("ERROR: Issue with bind. (%d)\n", GETSOCKETERRNO());
+        fprintf(stderr, "ERROR: Issue with bind. (%d)\n", GETSOCKETERRNO());
         return 1;
     }
     freeaddrinfo(bind_address);
@@ -60,7 +61,8 @@ int main(){
     char read[1024];
     int bytes_read = recvfrom(socket_listen, read, 1024, 0, (struct sockaddr*) &client_address, &client_len);
 
-    printf("Received %d bytes: %.*s\n", bytes_read, read);
+    printf("Received %d bytes: %.*s\n", bytes_read, bytes_read, read);
+    
 
     /*
     In previous programs, we only used the NI_NUMERICHOST flag to indicate 
@@ -82,7 +84,7 @@ int main(){
     printf("Remote address is:\n");
     char address_buffer[100];
     char service_buffer[100];
-    getnameinfo(&client_address, client_len, address_buffer, 
+    getnameinfo((struct sockaddr*) &client_address, client_len, address_buffer, 
         sizeof(address_buffer), service_buffer, sizeof(service_buffer), 
         NI_NUMERICHOST | NI_NUMERICSERV);
     printf("%s %s\n", address_buffer, service_buffer);
@@ -101,6 +103,6 @@ int main(){
     WSACleanup();
 #endif    
 
-    printf("Finished.");
+    printf("Finished.\n");
     return 0;
 }
