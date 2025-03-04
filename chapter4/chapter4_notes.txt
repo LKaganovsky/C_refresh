@@ -1,0 +1,91 @@
+HOW UDP SOCKETS DIFFER
+The socket API for UDP sockets is very similar to that of TCP, similar enough that the code from the previous 
+chapter (tcp_client.c) can be updated to use UDP rather than TCP by only changing a single line:
+
+    hints.ai_socktype = SOCK_STREAM;    -->     hints.ai_socktype = SOCK_DGRAM;
+
+Note that changing this line does not mean the client behaves the same way as before--UDP provides no guarantees 
+regarding arrival and order of arrival. While a simple program like this may be superficially similar in function 
+to its TCP progenitor, increasing complexity will lead to this difference growing more stark.
+
+UDP CLIENT METHODS
+Whereas TCP requires a connection to be established before exchanging data between a client and a server, UDP has 
+no need for such setup. With TCP, connect() is required before send()ing data, like so:
+
+    connect(tcp_socket, peer_address, peer_address_length);
+    send(tcp_socket, data, data_length, 0);
+
+While UDP can simply use sendto() with a target address:
+
+    sendto(udp_socket, data, data_length, 0, peer_address, peer_address_length);
+
+Notice the syntactic similarities--sendto() mimics the format of connect() and send(), with parameters from both 
+being passed in. However, connect() can still be called on a UDP socket. On a TCP socket, connect() is 
+necessary for performing a handshake between the server and client, identifying one another and agreeing to 
+common parameters for the data transfer. On a UDP socket, connect() only stores an address locally. A UDP client 
+then can be structured in two ways--one mimicking TCP and using connect(), send() and recv(), or one using the 
+provided UDP functions, sendto() and recvfrom(). Compare methods below:
+
+    TCP/UDP Client:     UDP Client:
+    
+    getaddrinfo()       getaddrinfo()
+        v                   v
+    socket()            socket()
+        v
+    bind()
+        v                   v
+    connect() 
+        v
+    send()              sendto()
+        v                   v
+    recv()              recvfrom()
+        v                   v
+    close()             close()
+
+The UDP client can use the exact same functions as a TCP client, though the behaviours will differ somewhat:
+
+    - connect() TCP:    Establishes a connection between the client and server.
+    - connect() UDP:    Sets remote address.
+    - send() TCP:       Sends data over an established connection.
+    - send() UDP:       Sends data to the remote address.
+    - recv() TCP:       Receive data from established connection.
+    - recv() UDP:       Receive data from remote address.
+
+Compare with two UDP exclusive functions:
+
+    - sendto():         Sends data to any given address
+    - recvfrom():       Receives data from any address
+
+An important feature to note when considering using connect() for a UDP client is that the client will only 
+receive data from the peer that has the IP address and port number given to connect(). When not using connect(), 
+recvfrom() returns data from any peer that addresses the client (provided they know the address and port number). 
+Unless bind() is called, the local address and port are assigned automatically by the operating system.
+
+UDP SERVER METHODS
+Unlike a TCP server which requires a socket for every peer connection, a UDP server only really requires one 
+socket which can communicate with many peers! TCP servers are required to use listen() and accept() when 
+establishing new connections, wheras UDP servers simply require binding to a local address, and then can 
+immediately start sending and receiving data.
+
+    TCP SERVER          UDP SERVER
+
+    getaddrinfo()       getaddrinfo()
+        v                   v
+    socket()            socket()
+        v                   v
+    bind()              bind()
+        v
+    listen()
+        v                   v
+    accept()
+        v
+    recv()              recvfrom()
+        v                   v
+    send()              sendto()
+        v                   v
+    close()             close()
+
+Recall the above section on differences in behaviour between functions between TCP and UDP servers. Also, note 
+that select() can be used to check/wait for incoming data. In a TCP server, select() will likely be monitoring 
+many sockets, while in a UDP server select() typically only monitors one. For a program that uses both TCP and 
+UDP sockets, a single call to select() can monitor them both.
