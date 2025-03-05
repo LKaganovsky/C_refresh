@@ -64,7 +64,7 @@ Unless bind() is called, the local address and port are assigned automatically b
 UDP SERVER METHODS
 Unlike a TCP server which requires a socket for every peer connection, a UDP server only really requires one 
 socket which can communicate with many peers! TCP servers are required to use listen() and accept() when 
-establishing new connections, wheras UDP servers simply require binding to a local address, and then can 
+establishing new connections, whereas UDP servers simply require binding to a local address, and then can 
 immediately start sending and receiving data.
 
     TCP SERVER          UDP SERVER
@@ -89,3 +89,39 @@ Recall the above section on differences in behaviour between functions between T
 that select() can be used to check/wait for incoming data. In a TCP server, select() will likely be monitoring 
 many sockets, while in a UDP server select() typically only monitors one. For a program that uses both TCP and 
 UDP sockets, a single call to select() can monitor them both.
+
+QUESTIONS
+1. How do sendto() and recvfrom() differ from send() and recv()?
+    The sendto() and recvfrom() functions do not require an existing connection, and can be used to send/receive 
+    from any address. The send() and recv() functions can be used after calling connect(), and will only be able 
+    to send to the address specified by connect().
+
+2. Can send() and recv() be used on UDP sockets?
+    The send() and recv() functions can be used on UDP sockets, and provide unique behaviour compared to sendto() 
+    and recvfrom(). Syntactically, the functions look like this:
+
+        - send      (socket, buffer, buffer_size, flags);
+        - sendto    (socket, buffer, buffer_size, flags, dest_address, dest_addr_size);
+
+        - recv      (socket, buffer, buffer_size, flags);
+        - recvfrom  (socket, buffer, buffer_size, flags, src_address, src_addr_len);
+
+    Using send() and recv() on a UDP socket will directly mimic the behaviour of TCP sockets, only being able to 
+    send to the address specified prior by connect(). Using sendto() and recvfrom() however utilizes the 
+    connectionless nature of UDP and allows for data to be sent to any address and received from any address.
+
+3. What does connect() do in the case of a UDP socket?
+    Using connect() on a TCP socket initiates a three-way-handshake and connects the specified socket to the 
+    address it is given. On a UDP socket, connect() associates a socket with the address it is given, and makes 
+    it so the socket can only send to/receive from that address.
+
+4. What makes multiplexing with UDP easier than TCP?
+    Unlike TCP, a single UDP socket can communicate with multiple peers at once. For TCP, a new socket is 
+    necessary for every peer.
+
+5. What are the downsides of UDP compared to TCP?
+    UDP provides no guarantees regarding timely or in-order arrival of packets, or that the packets will arrive 
+    at all.
+
+6. Can the same program use TCP and UDP?
+    The same program can implement both TCP and UDP.

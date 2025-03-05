@@ -5,14 +5,14 @@
 int main(){
 #if defined(_WIN32)
     WSADATA d;
-    if (WSAStartup(MAKEWORD, 2, 2, &d)) {
+    if (WSAStartup(MAKEWORD (2, 2), &d)) {
         fprintf(stderr, "ERROR: Issue with Windows-specific behaviour.\n");
         return 1;
     }
 #endif
 
     /*
-    The remo address 127.0.0.1 and port 8080 are hard-coded. This means that 
+    The remote address 127.0.0.1 and port 8080 are hard-coded. This means that 
     this program will only connect to the UDP server if it is running on the 
     same computer. 
 
