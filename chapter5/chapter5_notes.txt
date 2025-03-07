@@ -1,0 +1,125 @@
+USING GETADDRINFO()
+Defined as folows:
+
+    int getaddrinfo( 
+        const char* node,
+        const char* service, 
+        const struct addrinfo* hints,
+        struct addrinfo** res
+    );
+
+Explanation is as follows:
+    - "node" is the hostname or address as a string, such as "127.0.0.1" or "example.com"
+    - "service" is the port number as a string, may be a number or protocol name such as "80" or "http"
+    - "hints" is a pointer to an addrinfo structure, defined as follows:
+        struct addrinfo {
+            int                 ai_flags,
+            int                 ai_family,
+            int                 ai_socktype,
+            int                 ai_protocol,
+            socklen_t           ai_addrlen,
+            struct sockaddr*    ai_addr,
+            char                canonname,
+            struct addrinfo*    ai_next
+        }
+
+    Note that the fields above may or may not be stored in this order, it depends on the operating system.
+
+The call to getaddrinfo() examines 4 fields of the hints structure: ai_family, ai_socktype, ai_protocol and 
+ai_flags. The rest of the structure should be zeroed out with memset. The four fields may contain the following 
+values:
+    -   ai_family: The desired address family.
+        -   AF_INET for IPv4.
+        -   AF_INET6 for IPv6.
+        -   AF_USPEC for either IPv4 or IPv6. Defined as 0.
+    -   ai_socktype: The desired type of socket.
+        -   SOCK_STREAM for TCP.
+        -   SOCK_DGRAM for UDP.
+    -   ai_protocol: The desired protocol.
+        -   This should be left to 0 in most cases. TCP is not the only streaming protocol supported by the 
+            socket interface, and UDP is not the only datagram protocol. Typically, ai_protocol is used to 
+            disambiguate, but is not necessary for most programs.
+    - ai_flags: The desired flags.
+        -   AI_NUMERICHOST can be used to prevent name lookups--that is to say, only allowing numerical network 
+            addresses (such as 127.0.0.1) and not hostnames (like example.com). As DNS lookups may be lengthy, it 
+            may be wise to use this flag when the numerical address is already known to save time.
+        -   AI_NUMERICSERV works similarly, preventing service names (such as http) from being entered as a 
+            service and instead forces them to be entered as numbers (like 80).
+        -   AI_ALL can be used to request either an IPv4 or IPv6 address (TODO: Isn't this what AF_INET/AF_INET6 
+            is supposed to be for?).
+        -   AI_ADDRCONFIG can be used to obtain addresses only if they match a configured interface on the local 
+            system--IPv4 addresses will be returned only if the system has at least one IPv4 address, and IPv6 
+            addresses will be returned only if the system has at least one IPv6 address. Note that the loopback 
+            address is not considered a valid configured address. This flag may be useful for niche systems which 
+            do not support dual-stack IP addressing, ensuring that getaddrinfo() does not return an IPv6 address 
+            on an IPv4-only system which would cause bind() and connect() to fail every time (TODO: So can 
+            getaddrinfo() return addresses without network adapters?).
+        -   AI_PASSIVE can be used with node=0 to request the wildcard address, the local address which accepts 
+            connections on any of the host's network addresses. It is used with bind() on servers. If AI_PASSIVE 
+            is set and node is not 0, then AI_PASSIVE will have no effect.
+        -   Flags can be combined using bitwise OR operations (a | between flags).
+
+The final parameter to getaddrinfo(), res, is a pointer to a pointer to struct addrinfo which will store the 
+results of getaddrinfo() in a linked list.
+
+On a sucessful execution, getaddrinfo() will return 0. Once an address has been selected and bound to a socket, 
+use freeaddrinfo() to clear the linked list.
+
+USING GETNAMEINFO()
+The getnameinfo() function is the functional inverse of getaddrinfo(), converting address information into 
+readable text. The function is defined as follows:
+
+    int getnameinfo(
+        const struct sockaddr*  addr,
+        socklen_t               addrlen,
+        char*                   host, 
+        socklen_t               hostlen,
+        char*                   serv, 
+        socklen_t               servlen,
+        int                     flags
+    );
+
+The first two parameters, addr and addrlen, are the ai_addr and ai_addrlen fields of struct addrinfo. host and 
+hostlen specify a buffer and the length of that buffer where the host name will be saved, serv and servlen 
+perform the same purpose. 0 can be passed into any field you do not need. Flags may be a bitwise OR combination 
+of the following:
+    -   NI_NAMEREQD can be used to make getnameinfo() return a hostname instead of an address. By default, the 
+        function will try to return a hostname, but will return an address if that fails. If getnameinfo() has 
+        been called with this flag, it will return an error if it cannot get a hostname.
+    -   NI_DGRAM can be used to specify that the service is based on UDP, not TCP. This is only really important 
+        for ports that have different standard servies for TCP and UDP. If the NI_NUMERICHOST flag is set, this 
+        flag is ignored. (TODO: )
+    -   NI_NUMERICHOST can be used to make getnameinfo() return an IP address instead of a hostname.
+    -   NI_NUMERICSERV can be used to make getnameinfo() return a port number instead of a service name.
+
+The getnameinfo() function essentially performs a reverse DNS lookup. Whereas a regular DNS lookup has a client 
+requesting the IP address associated with a hostname, getnameinfo() requests the hostname associated with an IP 
+address. Note that this relationship is rarely one-to-one--a hostname may have many IP addresses associated with 
+it, but each IP address only stores a DNS record for one hostname.
+
+The getnameinfo() function is used like so:
+
+    char host[100];
+    char serv[100];
+    int getnameinfo(
+        address->ai_addr,
+        address->ai_addrlen,
+        host, 
+        sizeof(host), 
+        serv, 
+        sizeof(serv), 
+        0);
+    printf("%s %s\n", host, serv);
+
+In the above example, if address is a struct addrinfo with the address for example.com port 80 (http) then the 
+code may print something like the following:
+
+    example.com http
+
+If we instead would like the IP address and port number, then we can replace the 0 flag with NI_NUMERICHOST | 
+NI_NUMERICSERV and get something like the following:
+
+    93.184.216.34 80
+
+Adding NI_NUMERICHOST actually speeds up execution of getnameinfo() since the function does not need to perform a 
+reverse DNS lookup.
