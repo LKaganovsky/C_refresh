@@ -123,3 +123,76 @@ NI_NUMERICSERV and get something like the following:
 
 Adding NI_NUMERICHOST actually speeds up execution of getnameinfo() since the function does not need to perform a 
 reverse DNS lookup.
+
+THE DNS PROTOCOL
+In a typical exchange, a client sends a DNS query to a DNS server over UDP using port 53, and the DNS server 
+performs the lookup (if possible) and responds with an answer. In the event that the query (or more commonly, 
+the answer) is too large to fit into a single UDP packet, then the size of the query is sent over in a TCP packet 
+as a 16 bit value, followed by the query itself. This is known as TCP fallback or DNS transport over TCP.
+
+DNS MESSAGE FORMAT
+Every DNS message, whether a query or answer, follows this format:
+
+    -   Header: Information about the message
+    -   Question: Question for the name server
+    -   Answer: Answer from the name server
+    -   Authority: Pointers to other name servers
+    -   Additional: Additional information
+
+Clients sending DNS queries will leave the latter three sections blank, and responses often leave the latter two 
+sections blank.
+
+DNS MESSAGE HEADER FORMAT:
+The header is a constant 12 bytes and follows the same format between queries and answers.
+    -   ID: Any 16 bit value used to identify the DNS message. Any 16 bits can go here, and the DNS server will 
+        copy these into the ID for the answer.
+    -   QR: A 1 bit field which indicates if a DNS message is a query (0) or response (1).
+    -   OPCODE: A 5 bit field which signifies the specific type of query. This field only allows for four 
+        values--standard (0), reverse (1), server status request (2). Values 3 to 15 are reserved for future 
+        use.
+    -   AA: Indicates an authoritative answer.
+    -   TC: Indicates that the message was truncated and requires resending over TCP.
+    -   RD: Indicates that the sender desires a recursive search--that is, the server will contact other servers 
+        until the request is completed.
+    -   RA: Indicates whether the DNS server supports recursion or not.
+    -   Z: Unused.
+    -   RCODE: Error code, 0 is expected (no error).
+    -   QDCOUNT, ANCOUNT, NSCOUNT, ARCOUNT: The number of records for each corresponding section--number of 
+        entries in the question section (though this is always 1), answer section, name server resource records 
+        in the authority records section, and additional records.
+
+DNS QUESTION FORMAT
+The DNS question format consists of the following values:
+    -   NAME: A specially encoded field consisting of a hostname broken up into individual labels, each label is 
+        prepended with a byte representing the length of the label. The name is terminated with a 0 byte.
+        -   3 w w w 7 e x a m p l e 3 c o m 0
+    -   QTYPE: A 16 bit field representing the type of record requested.
+    -   QCLASS: A 16 bit field, for our purposes, should always be set to 1 to indicate "internet"
+
+ANSWER FORMAT
+The DNS answer format contains the same three fields as the DNS question, but with several changes:
+    -   NAME: An owner name, the name of the node to which this resource record pertains to.
+    -   TYPE: A 16 bit field representing the type of record requested (RR TYPE?).
+    -   CLASS: A 16 bit field representing the type of class requested (RR CLASS?).
+    -   TTL: A 32 bit signed integer field specifying the record's "time to live," the time it may be cached for 
+        by the client (in seconds).
+        RDLENGTH: A 16 bit unsigned integer representing the length of the follwing data.
+
+Note that a DNS answer may need to repeat a name multiple times. In this case, the DNS server may encode a 
+pointer to an earlier name rather than sending the name multiple times in every response message. A pointer is 
+indicated by a 16 bit value with the two highest bits set--the remaining 14 bits specify the location of the 
+name as an offset from the beginning of the message. 
+
+ENDIANNESS
+When considering the storage of numbers, most will assume they are stored in the same order as they are written, 
+with the most significant digit first, followed by digits of decreasing significance. However, this is not the 
+case for all operating systems--while most store bytes in a "big endian" format, with the most significant bit 
+first, some store numbers in the "little endian" format with the least significant bit first. These terms also 
+apply to the order in which bytes are sent over a network.
+
+Consider for example the number 0x05 (5 in decimal). Sending this over a network is trivial--as a single byte, 
+there is no ambiguity how to send it. But for a number like 0x03E7 (3*256 + 231 = 999 in decimal) which requires 
+two bytes, the question of which byte to send first comes into play.
+
+Numbers in DNS messages are kept in network byte order (that is, big endian). According to this, 0x0eE7 would be 
+sent as 0x03 followed by 0xE7.
