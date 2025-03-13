@@ -13,3 +13,4 @@ chapter4/udp_client
 chapter4/udp_sendto
 chapter4/udp_serve_toupper
 chapter5/lookup
+chapter5/dns_query
