@@ -21,11 +21,7 @@ name pointers. the end pointer is required so we do not read past the end of
 the message.
 
 TODO: Is p required, or a convenience? Is end necessary?
-
 */
-const unsigned char* print_name(const unsigned char* msg, const unsigned char* p, const unsigned char* end);
-
-
 const unsigned char* print_name(const unsigned char* msg, const unsigned char* p, const unsigned char* end) {
     /*
     A name should consist of at least a length and some text. If p is within 
@@ -269,7 +265,7 @@ void print_dns_message(const char* message, int msg_length) {
                 fprintf(stderr, "End of message.\n");
                 exit(1);
             }
-
+            
             const int type = (p[0] << 8) + p[1];
             printf("  type: %d\n", type);
             p += 2;
@@ -280,10 +276,13 @@ void print_dns_message(const char* message, int msg_length) {
     }
     
     /*
+    If there are answer resource records, name server resource records, or 
+    additional resource records, print them.
     */
     if (ancount || nscount || arcount) {
         int i;
-        for (i = 0;i < ancount + nscount + arcount; ++i) {
+        /* If we are past the end of the message, exit. */
+        for (i = 0; i < ancount + nscount + arcount; ++i) {
             if (p >= end) {
                 fprintf(stderr, "End of message\n");
                 exit(1);
@@ -291,13 +290,14 @@ void print_dns_message(const char* message, int msg_length) {
             printf("Answer %2d\n", i + 1);
             printf("  name: ");
 
-            p = print_name(msg, p, end); printf("\n");
+            p = print_name(msg, p, end); 
+            printf("\n");
 
             if (p + 10 > end) {
                 fprintf(stderr, "End of message.\n"); 
                 exit(1);
             }
-
+            
             const int type = (p[0] << 8) + p[1];
             printf("  type: %d\n", type);
             p += 2;
@@ -358,11 +358,13 @@ int main(int argc, char* argv[]) {
         exit(0);
     }
 
+    /* Makes sure the hostname isn't too long. */
     if (strlen(argv[1]) > 255) {
         fprintf(stderr, "Hostname too long.");
         exit(1);
     }
 
+    /* Check for requested record type */
     unsigned char type;
     if (strcmp(argv[2], "a") == 0) {
         type = 1;
@@ -380,6 +382,7 @@ int main(int argc, char* argv[]) {
         exit(1); 
     }
 
+    /* Usual Winsock initialization. */
 #if defined(_WIN32)
     WSADATA d;
     if (WSAStartup(MAKEWORD(2, 2), &d)) {
@@ -388,6 +391,12 @@ int main(int argc, char* argv[]) {
     } 
 #endif
 
+    /* 
+    Note the hardcoded IP address here--this is the primary DNS server of 
+    Google, though any other DNS with a constant address (Like Cloudflare's
+    1.1.1.1) would work. The rest of this is just regular initialization of a 
+    UDP socket to send and recv with.
+    */
     printf("Configuring remote address...\n");
     struct addrinfo hints;
     memset(&hints, 0, sizeof(hints));
@@ -408,50 +417,65 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    char query[1024] = {0xAB, 0xCD, /* ID */
+    /*
+    Build the query for the DNS. According to the textbook, "the first 12 
+    bytes compose the header and are known at compile time." 
+    */
+    char query[1024] = {0xAB, 0xCD, /* ID */ 
                         0x01, 0x00, /* Set recursion */
                         0x00, 0x01, /* QDCOUNT */
                         0x00, 0x00, /* ANCOUNT */
                         0x00, 0x00, /* NSCOUNT */
-                        0x00, 0x00 /* ARCOUNT */};
+                        0x00, 0x00  /* ARCOUNT */};
 
+    /*
+    *p is a pointer to the end of the header, *h will be used to loop 
+    through the hostname. 
+    */
     char *p = query + 12;
     char *h = argv[1];
 
+    /* Encoding the user's desired hostname into the query. */
     while(*h) {
-        char *len = p;
+        char *len = p; /* beginning of label. */
         p++;
         if (h != argv[1]) ++h;
 
         while(*h && *h != '.') *p++ = *h++;
         *len = p - len - 1;
     }
-
+    /* Add a terminating 0. */
     *p++ = 0;
-    *p++ = 0x00; *p++ = type; /* QTYPE */
-    *p++ = 0x00; *p++ = 0x01; /* QCLASS */
 
+    /* Question type and question class. Class is always 1 (Internet). */
+    *p++ = 0x00; 
+    *p++ = type; /* QTYPE */
+    *p++ = 0x00; 
+    *p++ = 0x01; /* QCLASS */
 
+    /* Get query size. */
     const int query_size = p - query;
 
-    int bytes_sent = sendto(socket_peer,
-            query, query_size,
-            0,
-            peer_address->ai_addr, peer_address->ai_addrlen);
+    /* With size and length known, the query can now be sent. */
+    int bytes_sent = sendto(socket_peer, query, query_size, 0, 
+        peer_address->ai_addr, peer_address->ai_addrlen);
     printf("Sent %d bytes.\n", bytes_sent);
 
+    /* For debugging purposes, look at the query again. */
     print_dns_message(query, query_size);
 
+    /* It'd be wise to use select() here, but this works for now. */
     char read[1024];
     int bytes_received = recvfrom(socket_peer,
             read, 1024, 0, 0, 0);
 
     printf("Received %d bytes.\n", bytes_received);
 
+    /* Print the response. */
     print_dns_message(read, bytes_received);
     printf("\n");
 
-
+    /* Usual closing procedures. */
     freeaddrinfo(peer_address);
     CLOSESOCKET(socket_peer);
 
