@@ -196,3 +196,32 @@ two bytes, the question of which byte to send first comes into play.
 
 Numbers in DNS messages are kept in network byte order (that is, big endian). According to this, 0x0eE7 would be 
 sent as 0x03 followed by 0xE7.
+
+QUESTIONS
+1. Which function fills in an address needed for socket programming in a portable and protocol-independent way?
+    The getaddrinfo() function does so (as well as the obsolete gethostbyname() function).
+
+2. Which IP socket programming function can be used to convert an IP address back into a name?
+    The getnameinfo() function does so (as well as the obsolete gethostbyaddr() function).
+
+3. A DNS query converts a name into an address, and a reverse DNS query converts an address into a name. If you 
+    run a DNS query on a name, and then a reverse DNS query on the resulting address, do you always get back the 
+    name you started with?
+    No, there is no guarantee that the name you receive will be the name you started with. Both types of lookups 
+    will return whatever applicable records are found by the DNS server first.
+
+4. What are the DNS record types used to return IPv4 and IPv6 addresses for a name?
+    Records of type A are used to return IPv4 addresses, AAAA for IPv6.
+
+5. Which DNS record type stores special information about email servers?
+    MX type records are used to return email server addresses.
+
+6. Does getaddrinfo() always return immediately, or can it block?
+    getaddrinfo() may block if there is network congestion, since it queries a DNS server for a response. It may 
+    block for unpredictable amounts of time in the event that multiple DNS servers must be contacted, or if 
+    the hostname associated with the address isn't cached.
+
+7. What happens when a DNS response is too large to fit into a single UDP packet?
+    The DNS response packet arrives with the TC bit set in the header, indicating that the response is too large 
+    to be sent in a single UDP packet, and no answers are included (?). This indicates that the client must 
+    resend the DNS query over TCP instead of UDP.
