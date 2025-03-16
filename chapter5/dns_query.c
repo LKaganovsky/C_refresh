@@ -43,6 +43,18 @@ const unsigned char* print_name(const unsigned char* msg, const unsigned char* p
         indicate the pointer. We can be confident that p[1] is still within 
         message boundaries due to our check above that assured that p was at 
         least 2 bytes from the end. 
+
+        Take note of the technique used here. A temporary variable is 
+        allocated in memory for the duration of this calculation--it is up to 
+        the compiler to decide its size (?). The octet that p points to is 
+        masked with 0x3F to remove the 2 most significnt bits, and then 
+        shifted 8 bits left--note that these 6 bits are shifted into the next 
+        byte over, which is usually still part of the temporary variable, but 
+        is not guaranteed to be depending on the compiler's behaviour. This 
+        is a possible bug. 
+
+        If the temporary variable is at least 2 bytes, then the value of p[1] 
+        goes into the second byte. 
         */
         const int k = ((*p & 0x3F) << 8) + p[1]; 
         p += 2;
@@ -50,8 +62,6 @@ const unsigned char* print_name(const unsigned char* msg, const unsigned char* p
         /* 
         We can then call print_name recursively to print the name that p 
         points to. 
-        
-        TODO: 0x3F?
         */
         print_name(msg, msg+k, end);
         return p;
@@ -137,7 +147,7 @@ void print_dns_message(const char* message, int msg_length) {
     /*
     Print the value of the QR bit which determines if the message is a 
     question or a response. The QR value is the most significant bit of 
-    msg[2], so to isolate it we perform a logical AND on it with 128 (in 
+    msg[2], so to isolate it we perform a bitwise AND on it with 128 (in 
     binary, that's 0b10000000), and then shift it right 7 bits to turn it into 
     either 1 (0b00000001) or 0 (0b00000000). This is a clever way to make use 
     of bitwise operations (and the ternary operator) to make nice, compact 
@@ -261,14 +271,15 @@ void print_dns_message(const char* message, int msg_length) {
             If there is less than 4 whole octets between p and the end, that 
             space is unused and cannot hold a question. TODO: Double check.
             */
-            if (p + 4 >= end) {
-                fprintf(stderr, "End of message.\n");
+            if (p + 4 > end) {
+                fprintf(stderr, "End of message.\n"); 
                 exit(1);
             }
             
             const int type = (p[0] << 8) + p[1];
             printf("  type: %d\n", type);
             p += 2;
+
             const int qclass = (p[0] << 8) + p[1];
             printf(" class: %d\n", qclass);
             p += 2;
