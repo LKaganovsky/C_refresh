@@ -1,0 +1,3 @@
+THE HTTP(S) PROTOCOL
+HTTP is a very commonly used internet protocol that runs over TCP (port 80), often augmented by Transport 
+Layer Security (TLS) into HTTPS (HTTP Secure). This text covers HTTP, but everything applies to HTTP as well. 
