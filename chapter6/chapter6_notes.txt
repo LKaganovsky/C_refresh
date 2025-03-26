@@ -1,3 +1,171 @@
 THE HTTP(S) PROTOCOL
 HTTP is a very commonly used internet protocol that runs over TCP (port 80), often augmented by Transport 
 Layer Security (TLS) into HTTPS (HTTP Secure). This text covers HTTP, but everything applies to HTTP as well. 
+HTTP works using a typical client-server paradigm, where a client requests resources from the server with a 
+specially formatted request, and is given a reply by the server.
+
+HTTP REQUEST TYPES (COMMON)
+ -  GET:    Download a specified resource.
+ -  POST:   Send information to a server, typically changing the server's state somehow (such as uploading to a 
+            database, or changing a resource if the client has the appropriate permissions).
+ -  HEAD:   Retrieve information about the resource rather than the resource itself (such as the size of a file).
+
+HTTP REQUEST TYPES (RARE)
+ -  PUT:    Send a document to a web server--not used significantly anymore, POST is preferred in most cases. 
+            There is more oto say on the topic of PUT vs POST requests--PUT requests seem to be used more often 
+            for updating existing records on a server, while POST is for making new ones. PUT requests are 
+            idempotent, and use a parameterized path ("www.example.com/admin/customers/1234"), but are unsafe due 
+            to their ability to modify existing data on a server.
+ -  DELETE: Delete a specified resource--this is often done with POST as well.
+ -  TRACE:  Request diagnostic information from web proxies--most web requests do not go through a proxy, 
+            and many proxies do not support TRACE anyway.
+ -  CONNECT: 
+            Sometimes used to initiate an HTTP connection through a proxy server.
+ -  OPTIONS: 
+            Used to request a list of HTTP services the server supports, for example: "Allow: OPITONS, GET, 
+            HEAD, POST." Ironically, options is not supported by most servers.
+
+A request that is not supported will be given a reply with the error code 400 (Bad Request).
+
+HTTP REQUEST FORMAT
+Below is an example of a typical HTTP request (Accessing a page via an internet browser will by default send a 
+GET request):
+
+    GET /page1.htm HTTP/1.1
+    User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36
+    Accept-Language: en-US
+    Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8
+    Accept-Encoding: gzip, deflate
+    Host: example.com
+    Connection: Keep-Alive
+
+The first line is known as the request line--it is composed of the request type (GET), the document path 
+(/page1.htm) and the protocol version (HTTP/1.1). Note that it is important to properly terminate lines when 
+using text-based protocols, since different operating systems use different line terminators (Unix/Linux uses 
+LF (\n) for EOL, Windows uses CR LF (\r\n). LF stands for Line Feed and CR for Carriage Return)--for maximum 
+cross-compatability, "\r\n" is used in HTTP requests.
+
+The following fields are various header fields, formatted as a name, a colon and a value. These lines can be 
+analyzed as follows:
+
+    User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36
+        The User-Agent line informs the server what software is contacting it. Some servers may be indescriminate 
+        in serving resources, others less so--for example, a server may serve full documents to web crawlers, but 
+        paywalls to actual visitors
+
+    Accept-Language: en-US
+    Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8
+    Accept-Encoding: gzip, deflate
+        Information regarding what response the client will accept. Curiously, these are not strictly necessary.
+
+    Host: example.com
+        The only header field actually required--this informs the server which web host the client is requesting 
+        a resource from (since a web server may be hosting many different websites). Strangely enough, the 
+        request line what resource is requested ("/page1.htm"), but the host field is what specifies where that 
+        resource is being requested from.
+
+    Connection: Keep-Alive
+        Indicates that the client intends to send further requests. If the connection value is "Close," that 
+        informs the server that the client will be terminating the TCP connection after the completion of the 
+        current request.
+
+After the header, the client must send two blank lines ("\r\n\r\n") to the server indicate that it has completed 
+sending headers.
+
+HTTP RESPONSE FORMAT
+Similar to the HTTP request, the body component of an HTTP response is optional (though, most responses will 
+contain a body).
+
+    HTTP/1.1 200 OK
+    Cache-Control: max-age=604800
+    Content-Type: text/html; charset=UTF-8
+    Date: Fri, 14 Dec 2018 16:46:09 GMT
+    Etag: "1541025663+gzip"
+    Expires: Fri, 21 Dec 2018 16:46:09 GMT
+    Last-Modified: Fri, 09 Aug 2013 23:54:35 GMT
+    Server: ECS (ord/5730)
+    Vary: Accept-Encoding
+    X-Cache: HIT
+    Content-Length: 1270
+    <!doctype html>
+    <html>
+    <head>
+        <title>Example Domain</title>
+    ...
+
+The fields can be analyzed as follows:
+
+    HTTP/1.1 200 OK
+        The HTTP response status line--protocol version, response code and description.
+
+    Cache-Control: max-age=604800
+    Date: Fri, 14 Dec 2018 16:46:09 GMT
+    Etag: "1541025663+gzip"
+    Expires: Fri, 21 Dec 2018 16:46:09 GMT
+    Last-Modified: Fri, 09 Aug 2013 23:54:35 GMT
+        Information related to the caching of web pages. This isn't terribly important at the moment.
+
+    Content-Type: text/html; charset=UTF-8
+        The type of resource being sent by the server--for webpages, HTML is sent as "text/html", while images 
+        are sent seperately as something like "image/png," though there are many supported types. Just know that 
+        data isn't "mixed," resources of different types come in their own packets with their own headers.
+
+    Content-Length: 1270
+        Length of the content (the response body, not including header) in bytes.
+
+Following this is a single blank line, and then the HTTP response body. Note that the following data is not 
+necessarily text--it may be binary data representing an image, or something similar.
+
+HTTP RESPONSE CODES
+ -  200 OK:                 Resource request was successful and the response follows.
+
+If a resource was moved for whatever reason (typically, these are used to redirect traffic from unencrypted to 
+encrypted websites, or from a wwww subdomain to a bare one)
+ -  301 MOVED PERMANENTLY:  Resource moved to a new location, specificed by the Location header field. Future 
+                            requests should use this location.
+ -  307 MOVED TEMPORARILY:  Resource moved to a new location, specificed by the Location header field. Future 
+                            requests should not use this location, since the resource will be returned soon.
+
+Errors are indicated by response codes in the 400 to 500 range.
+ -  400 BAD REQUEST:        Request has some issue that prevents the server from interpreting it.
+ -  401 UNAUTHORIZED:       Client does not have authority to access the requested resource.
+ -  403 FORBIDDEN:          The client is forbidden to access the requested resource.
+ -  500 INTERNAL 
+    SERVER ERROR:           The server encountered an error while attempting to serve the client's request.
+
+RESPONSE BODY LENGTH
+The easiest way to determine the length of a reply is obviously the Content-Length response header--however, not 
+every response is able to provide this. Some servers may start sending data before the length of the response is 
+known. In this case, the server will include "Transfer-Encoding: chunked" in the header to indicate that data 
+will be sent in chunks. Chunks begin with the chunk length (in bytes, represented in hexadecimal) followed by the 
+line of data, and then a newline to indicate the end of the chunk. Once the requested data has been sent, the 
+server then sends a chunk of length 0 to indicate the transfer is complete.
+
+    HTTP/1.1 200 OK
+    Content-Type: text/plain; charset=ascii
+    Transfer-Encoding: chunked
+    44
+    Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eius
+    37
+    mod tempor incididunt ut labore et dolore magna aliqua.
+    0
+
+Note that there are other ways to indicate HTTP response body length, but servers are generally limited to using 
+either Content-Length or Transfer-Encoding: chunked. This is due to the fact that clients typically do not 
+explicitly state support for other methods, so those two are used as they are universal. After a transfer, the 
+server will perform whatever closing procedures are necessary to inform the client that the transfer is complete. 
+In HTTP/1.0, the server would simply close the connection, but this is a poor method of communication since it 
+is ambiguous as to why the connection was closed.
+
+UNIFORM RESOURCE LOCATORS
+URLs conveniently identify resources on the web. A URL can be interpreted like so:
+
+    http://example.com:80/res/page1.php?user=linda#account
+    
+    http                        protocol (generally specified, but will be assumed if omitted)
+    example.com                 hostname (IPv4 addresses work too, IPv6 addresses need square brackes e.g. [::1]) 
+    80                          post number (if not specified, client uses default port number for a protocol)
+    /res/page1.php?user=linda   path (client includes the query string in this, server does not)
+    ?user=linda                 query string (client does not assign significance to this)
+    #account                    hash (specifies a position within a document, not sent to the HTTP server)
+
