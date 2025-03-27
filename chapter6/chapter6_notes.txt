@@ -169,3 +169,107 @@ URLs conveniently identify resources on the web. A URL can be interpreted like s
     ?user=linda                 query string (client does not assign significance to this)
     #account                    hash (specifies a position within a document, not sent to the HTTP server)
 
+HTTP POST REQUESTS
+An HTTP POST request sends data from the client to the server. Unlike a GET request, a POST request includes a 
+body of variable length (possibly even 0). Since the information in the body of a POST request can vary, the 
+Content-Type header is used to indicate the type of the data (most typical value is "application/json"). Consider 
+the following HTTP POST request:
+
+    POST /orders HTTP/1.1
+    Host: example.com
+    User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:64.0)
+    Content-Type: application/json
+    Content-Length: 56
+    Connection: close
+    {"symbol":"VOO","qty":"10","side":"buy","type":"market"}
+
+note the differences between a POST request and GET request:
+    -   Request starts with POST, not GET
+    -   Content type is given
+    -   Content length is given
+    -   Message body is included
+
+ENCODING FROM DATA
+Most forms on websites use POST requests to send data to the server. A standard HTML form uses URL encoding (also 
+known as percent encoding). When url encoded form data is sent, the Content-Type header is set to 
+application/x-www-form-urlencoded. Consider the following HTML for a website's form page:
+
+    <form method="post" action="/submission.php">
+        <label for="name">Name:</label>
+        <input name="name" type="text"><br>
+        <label for="comment">Comment:</label>
+        <input name="comment" type="text"><br>
+        <input type="submit" value="submit">
+    </form>
+
+When submitted, the data is encoded in an HTTP POST request like so:
+
+    POST /submission.php HTTP/1.1
+    Host: 127.0.0.1:8080
+    User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_7)
+    Accept-Language: en-US
+    Accept-Encoding: gzip, deflate
+    Content-Type: application/x-www-form-urlencoded
+    Content-Length: 31
+    Connection: keep-alive
+
+    name=Alice&comment=Well+Done%21
+
+Note the "Content-Type: application/x-www-form-urlencoded" field. In this form, each field and value are paired 
+with an equal sign, and multiple form fields are separated by ampersands. Encoding must be done for special 
+characters--the original entry into the comment field was "Well done!" but it is sent as "Well+Done%21" with a 
+plus sign for the space and a precent sign followed by a hexadecimal value for the exclamation point.
+
+FILE UPLOADS
+When uploading a file, the browser will typically use the "multipart/form-data" content type, which uses a 
+boundary specifier to separate form data from the file attachment. The boundary specifier is a special delimiter 
+specified by the sender to separate parts of the submitted form data. Consider the form below, very similar to 
+the example above, but featuring an upload field:
+
+    <form method="post" enctype="multipart/form-data" action="/submit.php">
+        <input name="name" type="text"><br>
+        <input name="comment" type="text"><br>
+        <input name="file" type="file"><br>
+        <input type="submit" value="submit">
+    </form>
+
+If the user attaches a file and uploads, the browser will send an HTTP POST request like the following:
+
+    POST /submit.php HTTP/1.1
+    Host: example.com
+    Content-Type: multipart/form-data; boundary=-----------233121195710604
+    Content-Length: 1727
+    -------------233121195710604
+    Content-Disposition: form-data; name="name"
+    Alice
+    -------------233121195710604
+    Content-Disposition: form-data; name="comment"
+    Well Done!
+    -------------233121195710604
+    Content-Disposition: form-data; name="file"; filename="upload.txt"
+    Content-Type: text/plain
+    Hello.... <truncated>
+
+QUESTIONS
+1.  Does HTTP use TCP or UDP?
+    HTTP uses the TCP protocol (port 80).
+
+2.  What type of resources can be sent over HTTP?
+    Any file type can be transferred using HTTP, but it is most commonly used for HTML, CSS, and image types. 
+
+3.  What are the common HTTP request types?
+    The most common types are GET, POST and HEAD--less common are PUT, DELETE, TRACE, CONNECT and OPTIONS. 
+
+4.  What HTTP request type is typically used to send data from the server to the client?
+    GET is the most common type of HTTP request used by a client to request data from a server.
+
+5.  What HTTP request type is typically used to send data from the client to the server?
+    POST is the most common type of HTTP request used by a client to send data to the server.
+
+6.  What are two common methods to determine an HTTP response body length?
+    Consulting the Content-Length field (if available), or calculating it when the "Transfer-Encoding: chunked" 
+    field is set.
+
+7.  How is the HTTP request body formatted for a POST-type HTTP response?
+    This is determined by the application servicing the request. "json/application" and 
+    "application/x-www-form-urlencoded" are the most common Content-Types and have their own styles of formatting.
