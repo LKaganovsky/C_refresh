@@ -1,0 +1,17 @@
+THE HTTP SERVER
+HTTP servers must support multiple simultaneous connections from many clients at once. Each HTTP request needs to 
+be parsed, processed and sent an HTTP reply by our server. 
+
+THE SERVER ARCHITECTURE
+The main necessities of an HTTP server are:
+    -   Maintain multiple connections at once
+    -   Parse a complex text-based protocol
+    -   Handle malformed requests with the appropriate error behaviour
+    -   Serve files
+
+For the example in this chapter, a linked list is used to store data on each connected client (featuring the 
+address, socket and received data)
+
+CONTENT TYPES
+It is the job of the server to relay to the client information about the type of data it is sending, done with 
+the Content-Type header.
