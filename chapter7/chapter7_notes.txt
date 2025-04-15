@@ -14,4 +14,10 @@ address, socket and received data)
 
 CONTENT TYPES
 It is the job of the server to relay to the client information about the type of data it is sending, done with 
-the Content-Type header.
+the Content-Type header. The value of this header is a MIME type, a data type registered with IANA. On a Linux 
+system, you can check the MIME type of a file with the following:
+
+    file mime-type <file_name>
+
+For an unknown media type, a server should use the Content-Type application/octet-stream as default--this 
+indicates that the client browser should treat the content as an unknown binary blob.
