@@ -75,7 +75,7 @@ this, but for a larger application which is re-entrant (that is to say,
 capable of being interrupted and then resuming again before it finishes 
 executing). In that case, it would be wise to pass the root of the linked list 
 to each function call. */
-static struct client_into* clients;
+static struct client_info* clients;
 
 /*
 Simple function to retreive client_info object associated with a specific 
@@ -83,7 +83,7 @@ socket. If there is no appropriate client_info object, a new one is made
 and added to the client_info linked list.
 */
 struct client_info* get_client(SOCKET s) { 
-    struct client_info* ci = clients;
+    struct client_info *ci = clients;
 
     while (ci) {
         if (ci->socket == s) {
@@ -198,7 +198,7 @@ void send_404(struct client_info* client) {
     drop_client(client);
 }
 
-serve_resource(struct client_info* client, const char* path) {
+void serve_resource(struct client_info* client, const char* path) {
     /* Printed for debugging purposes. */
     printf("Serving resource %s to %s\n", path, get_client_address(client));
 
@@ -218,9 +218,19 @@ serve_resource(struct client_info* client, const char* path) {
     }
 
     /* Full path to the resource. */
-    char* full_path[128];
+    char full_path[128];
     sprintf(full_path, "public%s", path);
 
+    /*
+    Unix based systems use slashes ("/") to separate directories, while 
+    Windows based systems use a backslash ("\"). Here, we walk the path string 
+    and replace the slashes appropriately. Note that a double backslash is 
+    used in this code, since C interprets the first backslash as escaping the 
+    second backslash.
+
+    Many Windows functions handle this automatically, but we do it manually 
+    for peace of mind.
+     */
 #if defined(_WIN32)
     char *p = full_path;
     while (*p) {
@@ -229,4 +239,171 @@ serve_resource(struct client_info* client, const char* path) {
     }
 #endif
 
+    FILE *fp = fopen(full_path, "rb");
+
+    if (!fp) {
+        fprintf(stderr, "ERROR: Issue accessing resource.\n");
+        send_404(client);
+        return;
+    }
+
+    /*
+    Determine the size of the requested file. fseek() is used to set the file 
+    position indicator to 0 bits after SEEK_END. Note that 0L is used, which 
+    indicates a long integer, but with the value of 0. 
+
+    ftell() is used to obtain the current value of the file position indicator 
+    for file fp, and then rewind() is used to reset it to 0.
+    */
+    fseek(fp, 0L, SEEK_END);
+    size_t cl = ftell(fp);
+    rewind(fp);
+
+    const char* ct = get_content_type(full_path);
+
+    /* Temporary buffer to store header fields. */
+# define BSIZE 1024
+    char buffer[BSIZE];
+
+    /* Note the final send is only /r/n to delinate the header and body. */
+    sprintf(buffer, "HTTP/1.1 200 OK/r/n");
+    send(client->socket, buffer, strlen(buffer), 0);
+    sprintf(buffer, "Connection: close/r/n");
+    send(client->socket, buffer, strlen(buffer), 0);
+    sprintf(buffer, "Content-Length: %lu/r/n", cl);
+    send(client->socket, buffer, strlen(buffer), 0);
+    sprintf(buffer, "Content-Type: %sr/n", ct);
+    send(client->socket, buffer, strlen(buffer), 0);
+    sprintf(buffer, "/r/n");
+    send(client->socket, buffer, strlen(buffer), 0);
+
+    /*
+    Fill up the buffer using fread(), then enter a loop where data is sent 
+    with send() and read with fread() until all data is exhausted and there is 
+    nothing more to be read from the buffer.
+    */
+    int r = fread(buffer, 1, BSIZE, fp);
+    while (r) {
+        send(client->socket, buffer, r, 0);
+        r = fread(buffer, 1, BSIZE, fp);
+    }
+
+    fclose(fp);
+    drop_client(client);
+}
+
+int main(int argc, char* argv[]) {
+#if defined(_WIN32)
+    WSADATA d;
+    i (WSAStartup(MAKEWORD(2, 2), &d)) {
+        fprintf(stderr, "ERROR: Issue with Windows initialization.\n");
+        return1;
+    }
+#endif
+
+    /* Create listening socket at port 8080 */
+    SOCKET server = create_socket(0, "8080");
+
+    /* Note that this loop has no termination and listens forever. */
+    while (1) {
+        fd_set reads;
+        wait_on_clients(server);
+
+        /*
+        If server is in the fd_set reads, this indicates an incoming client 
+        connection. 
+        */
+        if(FD_ISSET(server, &reads)) {
+            /* Invalid socket number makes get_client() create a new socket. */
+            struct client_info* client = get_client(-1);
+
+            /* Populate fields of client and accept the connection. */
+            client->socket = accept(server, (struct sockaddr*) 
+                &client->address, 
+                    &client->address_length);
+
+            if (!ISVALIDSOCKET(client->socket)) {
+                fprintf(stderr, "ERROR: Issue with accept(). (%d)\n", 
+                    GETSOCKETERRNO());
+                return 1;
+            }
+            printf("New connection from %s\n", get_client_address(client));
+        }
+
+        /*
+        If an already connected client is sending data, walk the linked list 
+        of clients and use FD_ISSET to determine which clients have data 
+        available to read.
+        */
+        struct client_info* client = clients;
+        while(client) {
+            struct client_info* next= client->next;
+            if (FD_ISSET(client->socket, &reads)) {
+                /*
+                Check if there is still memory available in the received 
+                buffer of the client.
+                */
+                if (MAX_REQUEST_SIZE == client->received) {
+                    send_400(client);
+                    continue;
+                }
+                /* 
+                Receive data. 
+
+                TODO: How does "client->request + client->received" work as a
+                buffer? Look into this later
+                */
+                int r = recv(client->socket, 
+                    client->request + client->received, 
+                    MAX_REQUEST_SIZE - client->received, 0);
+
+                /*
+                Sudden client disconnects warrant memory cleanup. Successful 
+                data writes are finalized with a null terminator added 
+                to the end of that client's data buffer.
+                */
+                if (r < 1) {
+                    printf("Unexpected disconnect from %s.\n", 
+                        get_client_address(client));
+                    drop_client(client);
+                } else {
+                    client->received += r;
+                    client->request[client->received] = 0;
+
+                    /*
+                    If \r\n\r\n is found, the HTTP header has been received 
+                    and can now be parsed.
+                    */
+                    char *q = strstr(client->request, "\r\n\r\n");
+                    if (q) {
+                        /* Enforce that valid paths start with a slash. */
+                        if (strncmp("GET /", client->request, 5)) {
+                            send_400(client);
+                        } else {
+                            /* Set the start of the path to after "/GET" */
+                            char* path = client->request + 4;
+                            char* end_path = strstr(path, " ");
+                            /* Next space indicates end of path. */
+                            if (!end_path) {
+                                send_400(client); 
+                            } else {
+                                *end_path = 0;
+                                serve_resource(client, path);
+                            }
+                        }
+                    }
+                }
+            }
+            client = next;
+        }
+    }
+
+    printf("Closing socket...\n");
+    CLOSESOCKET(server);
+
+# if defined(_WIN32)
+    WSACleanup();
+#endif 
+    printf("Finished.\n");
+    return(0);
 }
