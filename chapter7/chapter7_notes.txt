@@ -21,3 +21,105 @@ system, you can check the MIME type of a file with the following:
 
 For an unknown media type, a server should use the Content-Type application/octet-stream as default--this 
 indicates that the client browser should treat the content as an unknown binary blob.
+
+SECURITY AND ROBUSTNESS
+A good, safe networked program should never trust the connected peer and never assume data is sent in a 
+particular format. It should also often check for errors, unexpected conditions and deviations from the 
+format in order to minimize security vulnerabilities. Consider the following code:
+
+    char buffer[1028] = {0};
+    char* p = buffer;
+
+    while(!strstr(p, " ")){
+        p += recv(client, p, 1028, 0);
+    }
+
+This mechanism is simple. 1028 bytes are allocated for a buffer into which data from a socket is written to using 
+the recv() function. In every iteration of the loop, character pointer p is updated to point to where the next 
+data should be written. Once strstr() detects a space character, the loop exits. This code could be adapted and 
+used to read data from a client until an HTTP verb is detected like "GET", indicating that the server should 
+begin processing the GET request.
+
+Note however that recv() can write past the end of the buffer! There is no check to affirm that there is still 
+space to write to, since recv() is given a buffer size of 1028 on every call. A network client may accidentally 
+(or purposefully) compromise your server by sending data until enough is overwritten that p enters the executable 
+segment of memory--a malicious actor could write executable code into here, or simply overwrite important data 
+until the server crashes. Now, consider the following:
+
+    char buffer[1028] = {0};
+    char* p = buffer;
+
+    while(!strstr(p, " ")){
+        p += recv(client, p, 1028 - (p - buffer), 0);
+    }
+
+This code solves the issue by having a flexible value of buffer space to be passed to recv(). However, another 
+issue arises--what if the client does not send a space or null terminator? If a client sends 1028 bytes of data 
+with no space or terminator, then strstr() will continue looking for those characters beyond the buffer and into 
+unallocated memory. Now, consider the following:
+
+    char buffer[1028] = {0};
+    char* p = buffer;
+
+    while(!strstr(p, " ")){
+        p += recv(client, p, 1027 - (p - buffer), 0);
+    }
+
+With the buffer size decremented by one, a spot is reserved for the space/null terminator. Now the code will not 
+read past the array bounds for buffer--but it is still very broken. Consider a client that sends a single null, 
+or 1027 characters exactly. The code will loop forever and block other clients from connecting. Be aware that C 
+requires special attention to avoid memory errors.
+
+A further issue with server software is that the server should allow access to some files and not others. If a 
+malicious client wanted to download arbitrary files from your server they could send an HTTP request such as:
+
+    GET /../secret_file.c HTTP/1.1
+
+to a naive HTTP server, and access files outside of the public directory! The code in web_server.c avoids obvious 
+requests like this by discarding any requested resources with a file path containing the ".." signifying the 
+parent directory. More robust software should use operating system features to detect requests like this, but 
+there is no easy cross-platform way to do this, so implemenation is complex.
+
+An additional interesting bug arises on Windows. If the client sends a request such as the following:
+
+    GET /whatever/PRN HTTP/1.1
+
+Then the code will react rather unexpectedly. PRN is a special filename in Windows, so when fopen() is used to 
+try and access it, Windows does not look for a file, but instead connects the client to a printer interface! 
+Additional special filenames exist--COM1 for serial port 1, LPT1 for parallel port 1, etc. Even with an 
+extension, like PRN.txt, Windows will still redirect instead of looking for a file.
+
+The most generally applicable piece of advice to be gleaned from all of this is that networked programs should 
+be given the minimal level of privilige possible. Network programs given only the minimum of resources and 
+permissions they need to function are far safer than expansive programs with rare security vulnerabilities 
+stemming from their scale and reach. It may be wise to have a separate account to run server software with 
+read-only access to files it needs to serve.
+
+OPEN SOURCE SERVERS
+For deploying web servers to the internet, consider using an implementation like Nginx or Apache which are 
+performant, cross platform, secure, well documented, written in C, and free. 
+
+QUESTIONS
+1.  How does an HTTP client indicate that they are finished sending the HTTP request?
+    A client terminates their HTTP request with a single blank line ("/r/n"). Note that this is different from 
+    the way the client delineates their HTTP request header from their HTTP request body, which is with a 
+    double blank line ("/r/n/r/n").
+
+2.  How does the HTTP client know what kind of content the HTTP server is sending?
+    The HTTP client consults the HTTP server response's "Content-Type" header field.
+
+3.  How does an HTTP server identify a file's media type?
+    An HTTP server identifies a file's media type by consulting its extension (.css, .html, .xml, etc). However, 
+    there are cases where this is not sufficient. Data from a database or dynamic pages are not "files" in the 
+    traditional sense and therefore lack an extension (the same can be said for bytestreams), so in this case, 
+    some other method must be devised to determine the media type. One way of doing this is 
+
+4.  How can you tell whether a file exists on your file system and is readable by your program? Is using 
+    fopen(filename, "r") != 0 a good test?
+    This may be a suitable solution in some situations, but much care and thought is required for server software 
+    for non-trivial applications. Attempting to open a file in read-only mode is perfectly acceptable for small 
+    programs in enclosed networks, but on a larger scale, the risk of malicious actors increases, and security 
+    flaws will arise--for example, on a Windows system, a bad actor could attempt to open the file "PRN," which 
+    does not exist in the public directory, but is interpreted by the operating system to refer to the printer 
+    interface. The OS would then connect the client to this printer interface.
+
