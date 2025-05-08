@@ -1,0 +1,57 @@
+
+
+SMTP DIALOGUE
+SMTP works in a one-at-a-time manner, with the client making requests and the server issuing responses. A typical 
+session is structured as follows, where mail.example.net is the client, mail.example.com is the server, and lines 
+are prefixed with C and S to indicate the client or server is sending.
+
+<Note that the client establishes a connection over TCP here--it is omitted because it is not really SMTP (?)>
+S: 220 mail.example.com SMTP server ready
+    The SMTP server initiates with a greeting, indicating it is ready to 
+    receive commands. 220 is the SMTP server code to indicate that the 
+    service is ready.
+C: HELO mail.example.net
+    The client identifies itself using the HELO command.
+S: 250 Hello mail.example.net [192.0.2.67]
+    The server responds, echoing the client's name.
+C: MAIL FROM:<alice@example.net>
+    The client sends a command indicating who the mail is from.
+S: 250 OK
+    The server responds to indicate that the sender is accepted.
+C: RCPT TO:<bob@example.com>
+    The client sends a command indicating who the receipient is.
+S: 250 Accepted
+    The server responds to indicate that the receipient is accepted.
+C: DATA
+    The client issues a DATA command to indicate that it will begin sending 
+    the contents of the email.
+S: 354, Enter message, ending with "." on a line by itself
+    The server responds informing the client to proceed.
+C: Date: Fri, 06 May 2025 12:23:20 +0000
+C: Subject: Re: The Cake
+C: 
+C: Do not forget to bring the cake!
+C:
+C: .
+    The client transfers the email.
+S: 250 OK
+    Thhe server acknowledges the transmission of the email.
+C: QUIT
+    The client ends the session. Unlike HTTP, it is permissible for a client 
+    to send multiple emails over the same SMTP connection.
+S: 221 Closing Connection
+    The server closes the connection.
+
+As review, the common commands the client issues follow:
+    - HELO: Used to identify the client to the server.
+    - MAIL: Specifies who is sending the mail. 
+    - RCPT: Specifies who is receiving the mail.
+    - DATA: Initiates the transfer of the email (including headers and body).
+    - QUIT: Ends the session.
+
+Similarly, the common response codes the server issues follow:
+    - 220: The service is ready.
+    - 250: The requested command has been executed.
+    - 354: Start sending the message.
+    - 221: The connection is closing.
+    - 5XX: Eror codes with variable meaning.
