@@ -1,4 +1,61 @@
+EMAIL SERVERS
+SMTP is a text-based application layer protocol operting on TCP port 25 used for delivering email between 
+servers. Note that SMTP is not used for every email exchange--for cases where the sender and receipient are 
+users of the same service provider, such as a gmail-to-gmail email, then Gmail may simply copy the content 
+of the sender's email into the receipient's inbox. In situations where the users use servers that are provided 
+by different organizations, such as a yahoo-to-gmail, then SMTP is typically used to transmit the email from 
+the Yahoo server to the Gmail server.
 
+Retreiving email from a mail service provider is a different ordeal than delivering it between mail service 
+providers. Webmail, a common replacement for email clients (which is to say, accessing your inbox through a 
+website rather than with an application), typically send email with HTTP (since that is what browsers use). In 
+this case, using the yahoo-to-gmail example, a yahoo webmail client will use HTTP to send mail to a yahoo email 
+server, which will then use SMTP to send the mail to the gmail email server. When the gmail user wants to access 
+their emails, they will use their webmail client to retreive them from the gmail server, which sends them using 
+HTTP. When a desktop client needs to retreive mail from a web server, either the Internet Message Access Protocol 
+(IMAP) or Post Office Protocol (POP) (with SMTP?) are used--SMTP is used primarily between email servers. Email 
+being sent from a client to a server using SMTP is referred to as "mail submission" and email being relayed 
+between email servers is referred to as "mail transmission."
+
+EMAIL TRANSMISSION
+The most common structure behind email transmission resembles the following:
+
+[Alice (desktop)] ---SMTP--> [Gmail server] ---SMTP--> [Yahoo server] ---HTTP--> [Bob (webmail)]
+
+In the above diagram, the gmail server acts as an SMTP relay--SMTP servers should only relay mail from trusted 
+users to avoid spam. Note also that a client does not necessarily need to send email through its provider's 
+SMTP server--instead, it can be done like this:
+
+[Alice (desktop)] ---SMTP--> [Yahoo server] ---HTTP--> [Bob (webmail)]
+
+In practice, the responsibility of delivery falls on the client's email provider (which has the noted advantage 
+of allowing redelivery if the destination mail server is not available), so it's wisest to follow the proper 
+route. SMTP servers also will only relay mail if they have confirmed the client has an account with them.
+
+SMTP SECURITY
+In a production environment, SMTP is secured if the communicating servers support it (The following examples 
+detail unsecured SMTP). Generally, the process of securing SMTP is as follows:
+
+1.  Have SMTP connections start out as plain text on port 25
+2.  SMTP client issues a STARTTLS command to upgrade to a secure, encrypted connection.
+    This secure connection simply runs all following SMTP commands through a TLS layer.
+3.  Continue sending as typical.
+
+Note that mail transmission between servers is always done on port 25, while desktop email clients use TCP 
+ports 465 or 585. ISPs prefer these ports because it allows them to block port 25 entirely to help prevent spam. 
+
+FINDING AN EMAIL SERVER
+An email address consists of two parts--the user, and domain, delineated by an '@' symbol. The domain name can 
+potentially use multiple email servers, and one mail server can provide services for many domain names. To 
+identify a mail server, a DNS lookup for an MX record must be performed. Recall that DNS servers store various 
+types of records and that MX ones specifically are used for email servers. The tools nslookup (mac, windows) and 
+dig (mac, linux) can be used to query for MX records, in the following manner:
+
+    nslookup -type=mx gmail.com
+    dig mx gmail.com
+
+When multiple MX records are found, mail should be delivered to the server with the lowest preference. For 
+services with equal priority, one is chosen at random.
 
 SMTP DIALOGUE
 SMTP works in a one-at-a-time manner, with the client making requests and the server issuing responses. A typical 
@@ -26,7 +83,10 @@ C: DATA
     The client issues a DATA command to indicate that it will begin sending 
     the contents of the email.
 S: 354, Enter message, ending with "." on a line by itself
-    The server responds informing the client to proceed.
+    The server responds informing the client to proceed. Note that if the user 
+    enters a line with nothing but a period on it, the STMP client will 
+    replace it with two periods ('..') to prevent premature termination. The 
+    recipient will reverse this to return the email to its original form.
 C: Date: Fri, 06 May 2025 12:23:20 +0000
 C: Subject: Re: The Cake
 C: 
@@ -35,7 +95,7 @@ C:
 C: .
     The client transfers the email.
 S: 250 OK
-    Thhe server acknowledges the transmission of the email.
+    The server acknowledges the transmission of the email.
 C: QUIT
     The client ends the session. Unlike HTTP, it is permissible for a client 
     to send multiple emails over the same SMTP connection.
