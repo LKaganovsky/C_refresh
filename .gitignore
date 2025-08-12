@@ -16,3 +16,4 @@ chapter5/lookup
 chapter5/dns_query
 chapter6/web_get
 chapter7/web_server
+.DS_Store

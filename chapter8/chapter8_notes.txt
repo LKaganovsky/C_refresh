@@ -115,3 +115,5 @@ Similarly, the common response codes the server issues follow:
     - 354: Start sending the message.
     - 221: The connection is closing.
     - 5XX: Eror codes with variable meaning.
+
+left off page 236
