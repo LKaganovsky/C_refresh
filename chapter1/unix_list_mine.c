@@ -5,26 +5,31 @@
 #include <stdlib.h>
 
 int main(){
-    struct ifaddrs *all_addresses;
-
-    if(getifaddrs(&all_addresses) == -1){
-        fprintf(stderr, "ERROR: No addresses found.\n");
-        exit(EXIT_FAILURE);
+    /*
+    Get a list of interface addresses. 
+    Then, list the interface name, family type, and address of each one. 
+    lo0	IPv4		127.0.0.1
+    */
+    struct ifaddrs* addresses;
+    if(getifaddrs(&addresses) == -1) {
+        printf("Issue with getifaddrs()\n");
+        return -1;
     }
 
-    struct ifaddrs *address = all_addresses;
-    while(address){
+    struct ifaddrs* address = addresses;
+    while(address) {
         int family = address->ifa_addr->sa_family;
-        if (family == AF_INET || family == AF_INET6) {
-            printf("%s\t%s\t", address->ifa_name, family == AF_INET ? "IPv4" : "IPv6");
-            const int family_size = family == AF_INET ? sizeof(struct sockaddr_in) : sizeof(struct sockaddr_in6);
+        if(family == AF_INET || family == AF_INET6) {
+            printf("%s\t", address->ifa_name);
+            printf("%s\t", family == AF_INET ? "IPv4" : "IPv6");
+
             char ap[100];
+            int family_size = family == AF_INET ? sizeof(struct sockaddr_in) : sizeof(struct sockaddr_in6);
+
+
             getnameinfo(address->ifa_addr, family_size, ap, sizeof(ap), 0, 0, NI_NUMERICHOST);
             printf("\t%s\n", ap);
-
         }
         address = address->ifa_next;
     }
-    freeifaddrs(all_addresses);
-    return 1;
 }
